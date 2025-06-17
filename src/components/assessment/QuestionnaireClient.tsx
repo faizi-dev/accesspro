@@ -8,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge"; // Added import for Badge
 import { AlertCircle, CheckCircle, Save, Send, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
@@ -237,3 +238,4 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
     </div>
   );
 }
+

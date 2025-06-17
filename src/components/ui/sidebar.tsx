@@ -527,59 +527,66 @@ const sidebarMenuButtonVariants = cva(
 type SidebarMenuButtonCombinedProps = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "type"> &
   Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "type"> & {
     type?: React.ButtonHTMLAttributes<HTMLButtonElement>["type"];
-    asChild?: boolean; 
+    asChild?: boolean;
     isActive?: boolean;
     tooltip?: string | React.ComponentProps<typeof TooltipContent>;
   } & VariantProps<typeof sidebarMenuButtonVariants>;
 
 
 const SidebarMenuButton = React.forwardRef<
-  HTMLButtonElement | HTMLAnchorElement,
+  Element, // Use a more generic Element type for ref when dealing with Slot
   SidebarMenuButtonCombinedProps
 >(
   (
     {
-      asChild: localAsChild = false, // This component's specific asChild prop
+      asChild: renderAsSlot = false, // This prop determines if SidebarMenuButton itself renders a Slot
       isActive = false,
       variant = "default",
       size = "default",
       tooltip,
       className,
       children,
-      href, // Explicitly destructure href
-      ...restProps // All other props, might include asChild from a parent Link
+      href: directHref, // href passed directly as a prop to SidebarMenuButton
+      type,
+      ...propsFromCaller // All other props, including those from a parent Link (like href, onClick, and Link's own asChild)
     },
     ref
   ) => {
     const { isMobile, state } = useSidebar();
 
-    // Remove 'asChild' from restProps if it was passed down from a parent (e.g., Link)
-    // We only care about 'localAsChild' for determining if this SidebarMenuButton renders a Slot.
-    const { asChild: _forwardedAsChild, ...domFriendlyProps } = restProps as Omit<SidebarMenuButtonCombinedProps, "asChild"> & { asChild?: boolean };
+    // Determine the effective href. If Link asChild is used, propsFromCaller.href will exist.
+    const effectiveHref = directHref || (propsFromCaller as any).href;
 
+    // Determine the component to render.
+    // If renderAsSlot is true, SidebarMenuButton renders Slot (for its own children).
+    // Otherwise, if effectiveHref is present, it renders 'a'.
+    // Otherwise, it renders 'button'.
+    const Comp = renderAsSlot ? Slot : effectiveHref ? "a" : "button";
 
-    const Comp = localAsChild ? Slot : href ? "a" : "button";
-
-    const elementProps: any = {
-      ref: ref,
-      "data-sidebar": "menu-button",
-      "data-size": size,
-      "data-active": isActive,
-      className: cn(sidebarMenuButtonVariants({ variant, size, className })),
-      ...domFriendlyProps, // Spread the rest of the props, now without any asChild
+    // Prepare the props to be spread onto Comp.
+    // Crucially, remove any 'asChild' prop that might have come from a parent Link
+    // before spreading onto a DOM element ('a' or 'button').
+    // The 'asChild' prop named 'renderAsSlot' is already handled by the `Comp` variable.
+    const { asChild: asChildFromLink, ...safePropsFromCaller } = propsFromCaller as any;
+    
+    const finalProps: Record<string, any> = {
+        ...safePropsFromCaller, // Contains props from Link (like onClick) stripped of asChildFromLink
+        "data-sidebar": "menu-button",
+        "data-size": size,
+        "data-active": isActive,
+        className: cn(sidebarMenuButtonVariants({ variant, size, className })),
     };
 
-    if (href) {
-      elementProps.href = href;
+    if (Comp === "a") {
+        finalProps.href = effectiveHref;
+    } else if (Comp === "button") {
+        finalProps.type = type || "button";
     }
+    // If Comp is Slot, it will receive effectiveHref (if any) and other props from safePropsFromCaller.
+    // Slot itself will handle prop merging with its direct child.
 
-    // Set button type if it's a button and no type is provided
-    if (Comp === 'button' && !localAsChild && !elementProps.type) {
-      elementProps.type = 'button';
-    }
+    const element = React.createElement(Comp, { ref, ...finalProps }, children);
     
-    const element = React.createElement(Comp, elementProps, children);
-
     if (!tooltip) {
       return element;
     }

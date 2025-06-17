@@ -98,7 +98,7 @@ export function AdminLayoutClient({ children }: { children: React.ReactNode }) {
             <SidebarMenu className="px-2">
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
-                  <Link href={item.href} passHref legacyBehavior>
+                  <Link href={item.href} asChild>
                     <SidebarMenuButton
                       isActive={pathname === item.href || (item.subItems && pathname.startsWith(item.href))}
                       tooltip={item.label}
@@ -112,7 +112,7 @@ export function AdminLayoutClient({ children }: { children: React.ReactNode }) {
                      <ul className="pl-7 pt-1 space-y-1 group-data-[collapsible=icon]:hidden">
                        {item.subItems.map(subItem => (
                          <li key={subItem.href}>
-                           <Link href={subItem.href} passHref legacyBehavior>
+                           <Link href={subItem.href} asChild>
                              <SidebarMenuButton
                                 size="sm"
                                 isActive={pathname === subItem.href}
@@ -143,7 +143,7 @@ export function AdminLayoutClient({ children }: { children: React.ReactNode }) {
               <p className="text-xs text-muted-foreground">Administrator</p>
             </div>
           </div>
-          <Link href="/" passHref legacyBehavior>
+          <Link href="/" asChild>
             <SidebarMenuButton tooltip="Back to Site Home" className="mt-2 justify-start">
                 <Home className="w-5 h-5" />
                 <span className="group-data-[collapsible=icon]:hidden">Back to Home</span>

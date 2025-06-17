@@ -537,8 +537,8 @@ const sidebarMenuButtonVariants = cva(
 // Combined props type for polymorphism
 type SidebarMenuButtonCombinedProps = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "type"> &
   Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "type"> & {
-    type?: React.ButtonHTMLAttributes<HTMLButtonElement>["type"]; // Allow button type
-    asChild?: boolean;
+    type?: React.ButtonHTMLAttributes<HTMLButtonElement>["type"];
+    asChild?: boolean; // For SidebarMenuButton's own composition
     isActive?: boolean;
     tooltip?: string | React.ComponentProps<typeof TooltipContent>;
   } & VariantProps<typeof sidebarMenuButtonVariants>;
@@ -550,45 +550,48 @@ const SidebarMenuButton = React.forwardRef<
 >(
   (
     {
-      asChild: ownAsChild = false, // Distinguish from a potentially forwarded 'asChild'
+      asChild = false, // This is the asChild prop for SidebarMenuButton itself
       isActive = false,
       variant = "default",
       size = "default",
       tooltip,
       className,
       children,
-      ...rest // All other props, including href, onClick, type, etc.
+      // Other props like href, onClick (from Link), type (for button) will be in `domProps`
+      ...domProps 
     },
     ref
   ) => {
-    const { isMobile, state } = useSidebar()
+    const { isMobile, state } = useSidebar();
 
-    // Determine if it's a link by checking for the presence of 'href' in rest
-    const isLink = typeof (rest as React.AnchorHTMLAttributes<HTMLAnchorElement>).href === 'string'
+    // Determine if it's a link by checking for the presence of 'href' in domProps
+    const isLink = typeof (domProps as React.AnchorHTMLAttributes<HTMLAnchorElement>).href === 'string';
     
-    // The component to render: Slot if ownAsChild is true, 'a' if it's a link, otherwise 'button'
-    const Comp = ownAsChild ? Slot : isLink ? "a" : "button"
+    // If this component's `asChild` is true, it renders Slot.
+    // Otherwise, if `href` is present, it renders 'a'.
+    // Otherwise, it renders 'button'.
+    const Comp = asChild ? Slot : isLink ? "a" : "button";
 
-    // If a prop named 'asChild' was passed via '...rest' (e.g., from NextLink),
-    // we must remove it before spreading onto a DOM element like 'a' or 'button'
-    // as DOM elements do not recognize the 'asChild' prop.
-    const { asChild: _forwardedAsChild, ...safeRestProps } = rest as any;
+    // Construct the props for the element to be rendered
+    // `asChild` has been destructured, so it's not in `domProps` to be spread incorrectly.
+    const elementProps: React.ButtonHTMLAttributes<HTMLButtonElement> | React.AnchorHTMLAttributes<HTMLAnchorElement> = {
+      ref: ref as any, // Type assertion for polymorphic ref
+      "data-sidebar": "menu-button",
+      "data-size": size,
+      "data-active": isActive,
+      className: cn(sidebarMenuButtonVariants({ variant, size, className })),
+      ...domProps,
+    };
 
-    const element = (
-      <Comp
-        ref={ref}
-        data-sidebar="menu-button"
-        data-size={size}
-        data-active={isActive}
-        className={cn(sidebarMenuButtonVariants({ variant, size, className }))}
-        {...safeRestProps} // Spread the remaining props (href will be passed to 'a', type to 'button')
-      >
-        {children}
-      </Comp>
-    )
+    // If rendering a button and no type is specified, default to "button"
+    if (Comp === 'button' && !('type' in domProps)) {
+      (elementProps as React.ButtonHTMLAttributes<HTMLButtonElement>).type = 'button';
+    }
+    
+    const element = React.createElement(Comp, elementProps, children);
 
     if (!tooltip) {
-      return element
+      return element;
     }
 
     const tooltipContentProps = typeof tooltip === "string" ? { children: tooltip } : tooltip;
@@ -603,9 +606,9 @@ const SidebarMenuButton = React.forwardRef<
           {...tooltipContentProps}
         />
       </Tooltip>
-    )
+    );
   }
-)
+);
 SidebarMenuButton.displayName = "SidebarMenuButton"
 
 const SidebarMenuAction = React.forwardRef<

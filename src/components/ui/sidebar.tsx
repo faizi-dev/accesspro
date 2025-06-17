@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -533,58 +534,73 @@ const sidebarMenuButtonVariants = cva(
   }
 )
 
+// Combined props type for polymorphism
+type SidebarMenuButtonCombinedProps = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "type"> &
+  Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "type"> & {
+    type?: React.ButtonHTMLAttributes<HTMLButtonElement>["type"]; // Allow button type
+    asChild?: boolean;
+    isActive?: boolean;
+    tooltip?: string | React.ComponentProps<typeof TooltipContent>;
+  } & VariantProps<typeof sidebarMenuButtonVariants>;
+
+
 const SidebarMenuButton = React.forwardRef<
-  HTMLButtonElement,
-  React.ComponentProps<"button"> & {
-    asChild?: boolean
-    isActive?: boolean
-    tooltip?: string | React.ComponentProps<typeof TooltipContent>
-  } & VariantProps<typeof sidebarMenuButtonVariants>
+  HTMLButtonElement | HTMLAnchorElement,
+  SidebarMenuButtonCombinedProps
 >(
   (
     {
-      asChild = false,
+      asChild: ownAsChild = false, // Distinguish from a potentially forwarded 'asChild'
       isActive = false,
       variant = "default",
       size = "default",
       tooltip,
       className,
-      ...props
+      children,
+      ...rest // All other props, including href, onClick, type, etc.
     },
     ref
   ) => {
-    const Comp = asChild ? Slot : "button"
     const { isMobile, state } = useSidebar()
 
-    const button = (
+    // Determine if it's a link by checking for the presence of 'href' in rest
+    const isLink = typeof (rest as React.AnchorHTMLAttributes<HTMLAnchorElement>).href === 'string'
+    
+    // The component to render: Slot if ownAsChild is true, 'a' if it's a link, otherwise 'button'
+    const Comp = ownAsChild ? Slot : isLink ? "a" : "button"
+
+    // If a prop named 'asChild' was passed via '...rest' (e.g., from NextLink),
+    // we must remove it before spreading onto a DOM element like 'a' or 'button'
+    // as DOM elements do not recognize the 'asChild' prop.
+    const { asChild: _forwardedAsChild, ...safeRestProps } = rest as any;
+
+    const element = (
       <Comp
         ref={ref}
         data-sidebar="menu-button"
         data-size={size}
         data-active={isActive}
-        className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
-        {...props}
-      />
+        className={cn(sidebarMenuButtonVariants({ variant, size, className }))}
+        {...safeRestProps} // Spread the remaining props (href will be passed to 'a', type to 'button')
+      >
+        {children}
+      </Comp>
     )
 
     if (!tooltip) {
-      return button
+      return element
     }
 
-    if (typeof tooltip === "string") {
-      tooltip = {
-        children: tooltip,
-      }
-    }
+    const tooltipContentProps = typeof tooltip === "string" ? { children: tooltip } : tooltip;
 
     return (
       <Tooltip>
-        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipTrigger asChild>{element}</TooltipTrigger>
         <TooltipContent
           side="right"
           align="center"
           hidden={state !== "collapsed" || isMobile}
-          {...tooltip}
+          {...tooltipContentProps}
         />
       </Tooltip>
     )

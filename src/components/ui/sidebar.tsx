@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -524,12 +525,15 @@ const sidebarMenuButtonVariants = cva(
 )
 
 export interface SidebarMenuButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    React.AnchorHTMLAttributes<HTMLAnchorElement>,
-    VariantProps<typeof sidebarMenuButtonVariants> {
-  asChild?: boolean; // Does this SidebarMenuButton instance render as a Slot?
+  extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'type'>,
+    Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> {
+  asChild?: boolean; 
   isActive?: boolean;
   tooltip?: string | React.ComponentProps<typeof TooltipContent>;
+  variant?: VariantProps<typeof sidebarMenuButtonVariants>["variant"];
+  size?: VariantProps<typeof sidebarMenuButtonVariants>["size"];
+  href?: string; 
+  type?: string; 
 }
 
 const SidebarMenuButton = React.forwardRef<
@@ -538,25 +542,26 @@ const SidebarMenuButton = React.forwardRef<
 >(
   (
     {
-      asChild: renderAsSlot, // This is SidebarMenuButton's own asChild prop
+      asChild: renderAsSlotProp, 
       isActive = false,
       variant = "default",
       size = "default",
       tooltip,
       className,
       children,
-      href,
-      type, // Explicitly get type for button
-      ...otherProps // Contains all other props, potentially including `asChild` from a parent Link
+      href: hrefFromDirectProps, 
+      type: typeFromDirectProps, 
+      ...otherPropsFromCaller 
     },
     ref
   ) => {
     const { isMobile, state } = useSidebar();
 
-    const Comp = renderAsSlot ? Slot : href ? "a" : "button";
+    const effectiveHref = hrefFromDirectProps || (otherPropsFromCaller as any).href;
+    const Comp = renderAsSlotProp ? Slot : effectiveHref ? "a" : "button";
 
-    const elementProps: any = {
-      ...otherProps,
+    const elementProps: Record<string, any> = {
+      ...otherPropsFromCaller,
       ref,
       "data-sidebar": "menu-button",
       "data-size": size,
@@ -564,19 +569,18 @@ const SidebarMenuButton = React.forwardRef<
       className: cn(sidebarMenuButtonVariants({ variant, size, className })),
     };
 
-    if (Comp === "a") {
-      elementProps.href = href;
-    } else if (Comp === "button" && !renderAsSlot) {
-      // Ensure type is set for button, defaulting to "button" if not specified.
-      // The 'type' prop from HTMLButtonAttributes is already in otherProps if passed.
-      elementProps.type = type || "button";
+    if (typeof Comp === 'string' && elementProps.asChild) {
+      delete elementProps.asChild;
     }
-    
-    // CRITICAL: If Comp is a DOM element ('a' or 'button'),
-    // ensure 'asChild' (which might have come from a parent Link) is NOT passed to it.
-    // The 'renderAsSlot' prop (this component's own asChild) is handled by `Comp = renderAsSlot ? Slot : ...`
-    if (Comp === "a" || Comp === "button") {
-        delete elementProps.asChild;
+
+    if (Comp === "a") {
+      if (effectiveHref) {
+        elementProps.href = effectiveHref;
+      }
+      delete elementProps.type; 
+    } else if (Comp === "button") {
+      elementProps.type = typeFromDirectProps || (otherPropsFromCaller as any).type || "button";
+      delete elementProps.href; 
     }
     
     const buttonElementNode = React.createElement(Comp, elementProps, children);

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, type ChangeEvent, type FormEvent } from 'react';
@@ -16,7 +17,7 @@ import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
 
 // Helper to generate a slug-like ID
 const generateSlug = (text: string) => {
-  if (!text) return '';
+  if (!text) return `item-${uuidv4().substring(0,4)}`; // Fallback for empty text
   return text
     .toLowerCase()
     .replace(/\s+/g, '-') // Replace spaces with -
@@ -45,7 +46,7 @@ export default function UploadQuestionnairePage() {
           try {
             const content = e.target?.result as string;
             setJsonContent(content);
-            const parsed = JSON.parse(content);
+            const parsed = JSON.parse(content) as QuestionnaireUploadData; // Use the type
             if (parsed.versionName && !versionName) { // Auto-fill version name if empty
                 setVersionName(parsed.versionName);
             }
@@ -86,31 +87,41 @@ export default function UploadQuestionnairePage() {
         throw new Error("Invalid JSON structure: 'sections' array is missing or not an array.");
       }
 
-      const processedSections: Section[] = questionnaireData.sections.map((section, sIdx) => {
-        const sectionSlug = generateSlug(section.title?.substring(0,30) || `section${sIdx}`);
-        const sectionId = section.tempId ? `${section.tempId}_s_${sIdx}_${uuidv4().substring(0,4)}` : `${sectionSlug}-s${sIdx}-${uuidv4().substring(0,8)}`;
+      // Process sections from QuestionnaireUploadData to internal Section[] type
+      const processedSections: Section[] = questionnaireData.sections.map((sectionUpload, sIdx) => {
+        const sectionSlug = generateSlug(sectionUpload.name?.substring(0,30) || `section${sIdx}`);
+        const sectionId = sectionUpload.tempId 
+          ? `${sectionUpload.tempId}_s_${sIdx}_${uuidv4().substring(0,4)}` 
+          : `${sectionSlug}-s${sIdx}-${uuidv4().substring(0,8)}`;
         
+        if (typeof sectionUpload.weight !== 'number') {
+            throw new Error(`Section "${sectionUpload.name || `at index ${sIdx}`}" is missing a 'weight' or has an invalid one.`);
+        }
+
         return {
-          ...section,
           id: sectionId,
-          questions: section.questions.map((question, qIdx) => {
-            const questionSlug = generateSlug(question.text?.substring(0,30) || `question${qIdx}`);
-            // Ensure question ID is unique, even if tempId is provided but not unique across the JSON
-            const questionId = question.tempId 
-              ? `${question.tempId}_s${sIdx}_q${qIdx}_${uuidv4().substring(0,4)}` 
+          name: sectionUpload.name,
+          description: sectionUpload.description,
+          instructions: sectionUpload.instructions,
+          weight: sectionUpload.weight, // Ensure weight is present
+          questions: sectionUpload.questions.map((questionUpload, qIdx) => {
+            const questionSlug = generateSlug(questionUpload.question?.substring(0,30) || `question${qIdx}`);
+            const questionId = questionUpload.tempId 
+              ? `${questionUpload.tempId}_s${sIdx}_q${qIdx}_${uuidv4().substring(0,4)}` 
               : `${questionSlug}-s${sIdx}-q${qIdx}-${uuidv4().substring(0,8)}`;
             
             return {
-              ...question,
               id: questionId,
-              options: question.options.map((option, oIdx) => {
-                const optionSlug = generateSlug(option.text?.substring(0,15) || `option${oIdx}`);
-                const optionId = option.tempId 
-                  ? `${option.tempId}_s${sIdx}_q${qIdx}_o${oIdx}_${uuidv4().substring(0,4)}`
+              question: questionUpload.question,
+              options: questionUpload.options.map((optionUpload, oIdx) => {
+                const optionSlug = generateSlug(optionUpload.text?.substring(0,15) || `option${oIdx}`);
+                const optionId = optionUpload.tempId 
+                  ? `${optionUpload.tempId}_s${sIdx}_q${qIdx}_o${oIdx}_${uuidv4().substring(0,4)}`
                   : `${optionSlug}-s${sIdx}-q${qIdx}-o${oIdx}-${uuidv4().substring(0,8)}`;
                 return {
-                  ...option,
-                  id: optionId, 
+                  id: optionId,
+                  text: optionUpload.text,
+                  score: optionUpload.score, // Map 'score' from upload to 'score' in internal type
                 };
               }),
             };
@@ -121,9 +132,9 @@ export default function UploadQuestionnairePage() {
       const newVersionId = generateSlug(versionName) || `v-${Date.now()}`;
 
       const versionDoc = {
-        name: versionName,
+        name: versionName, // This is the overall questionnaire version name
         sections: processedSections,
-        isActive: false, 
+        isActive: false,
         createdAt: serverTimestamp(),
       };
 
@@ -149,46 +160,48 @@ export default function UploadQuestionnairePage() {
   };
   
   const sampleJson = `{
-  "versionName": "Sample Wellness Survey V1",
+  "versionName": "Sample Wellness Survey V2",
   "sections": [
     {
-      "title": "Diet and Wellness",
+      "name": "Diet and Wellness",
       "description": "This section explores your eating habits and awareness of wellness.",
-      "weight": 0.3,
+      "instructions": "Please answer honestly to get the most accurate feedback.",
+      "weight": 0.4,
       "questions": [
         {
-          "text": "How many servings of fruits and vegetables do you consume on average per day?",
+          "question": "How many servings of fruits and vegetables do you consume on average per day?",
           "options": [
-            { "text": "Less than 2 servings", "points": 1 },
-            { "text": "2-3 servings", "points": 2 },
-            { "text": "4-5 servings", "points": 3 },
-            { "text": "More than 5 servings", "points": 4 }
+            { "text": "Less than 2 servings", "score": 1 },
+            { "text": "2-3 servings", "score": 2 },
+            { "text": "4-5 servings", "score": 3 },
+            { "text": "More than 5 servings", "score": 4 }
           ]
         },
         {
-          "text": "How often do you engage in physical activity per week?",
+          "question": "How often do you engage in physical activity per week?",
           "options": [
-            { "text": "Rarely or never", "points": 1 },
-            { "text": "1-2 times a week", "points": 2 },
-            { "text": "3-4 times a week", "points": 3 },
-            { "text": "5 or more times a week", "points": 4 }
+            { "text": "Rarely or never", "score": 1 },
+            { "text": "1-2 times a week", "score": 2 },
+            { "text": "3-4 times a week", "score": 3 },
+            { "text": "5 or more times a week", "score": 4 }
           ]
         }
       ]
     },
     {
-      "title": "Mental Wellbeing",
+      "name": "Mental Wellbeing",
       "description": "Questions about your stress levels and coping mechanisms.",
-      "weight": 0.4,
+      "instructions": "Consider your typical week when answering these questions.",
+      "weight": 0.6,
       "questions": [
         {
-          "text": "How would you rate your average stress level on a scale of 1 to 5 (5 being highest)?",
+          "question": "How would you rate your average stress level on a scale of 1 to 5 (5 being highest)?",
           "options": [
-            { "text": "1 - Very Low", "points": 4 },
-            { "text": "2 - Low", "points": 3 },
-            { "text": "3 - Moderate", "points": 2 },
-            { "text": "4 - High", "points": 1 },
-            { "text": "5 - Very High", "points": 0 }
+            { "text": "1 - Very Low", "score": 4 },
+            { "text": "2 - Low", "score": 3 },
+            { "text": "3 - Moderate", "score": 2 },
+            { "text": "4 - High", "score": 1 },
+            { "text": "5 - Very High", "score": 0 }
           ]
         }
       ]
@@ -205,17 +218,17 @@ export default function UploadQuestionnairePage() {
             <CardTitle className="text-2xl font-headline">Upload New Questionnaire Version</CardTitle>
         </div>
         <CardDescription>
-          Provide a version name and upload a JSON file containing the questionnaire structure, questions, options, points, and section weights. If 'tempId' fields are provided, ensure they are reasonably unique as they will be part of the final generated ID. Otherwise, unique IDs will be generated.
+          Provide a version name (e.g., "Annual Customer Feedback 2024"). Then, upload or paste a JSON file with the new structure: sections should have 'name', 'description' (optional), 'instructions' (optional), 'weight', and 'questions'. Questions should have 'question' and 'options'. Options should have 'text' and 'score'. 'tempId' fields are optional for pre-defining parts of IDs.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <Label htmlFor="versionName" className="text-base">Version Name</Label>
+            <Label htmlFor="versionName" className="text-base">Version Name (for this questionnaire)</Label>
             <Input
               id="versionName"
               type="text"
-              placeholder="e.g., Q ideal 2024 Employee Survey"
+              placeholder="e.g., Q3 ideal 2024 Employee Survey"
               value={versionName}
               onChange={(e) => setVersionName(e.target.value)}
               required

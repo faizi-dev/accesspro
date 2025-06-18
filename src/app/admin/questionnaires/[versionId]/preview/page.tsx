@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { ArrowLeft, FileText, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, FileText, CheckCircle, AlertCircle, Info } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function PreviewQuestionnairePage() {
@@ -116,17 +116,23 @@ export default function PreviewQuestionnairePage() {
               <AccordionItem value={`section-${sectionIndex}`} key={section.id || sectionIndex}>
                 <AccordionTrigger className="text-lg font-semibold hover:no-underline">
                   <div className="flex items-center gap-2">
-                     <span className="text-primary">{sectionIndex + 1}.</span> {section.title} 
+                     <span className="text-primary">{sectionIndex + 1}.</span> {section.name} {/* Changed from section.title */}
                      <Badge variant="outline">Weight: {section.weight}</Badge>
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="space-y-4 pl-6 pr-2 pt-2">
-                  {section.description && <p className="text-sm text-muted-foreground mb-3">{section.description}</p>}
+                  {section.description && <p className="text-sm text-muted-foreground mb-2">{section.description}</p>}
+                  {section.instructions && (
+                    <div className="flex items-start gap-2 p-3 my-2 border border-blue-200 bg-blue-50/50 rounded-md text-sm text-blue-700">
+                      <Info className="h-5 w-5 mt-0.5 shrink-0" />
+                      <p>{section.instructions}</p>
+                    </div>
+                  )}
                   {section.questions.map((question: QuestionType, questionIndex: number) => (
                     <Card key={question.id || questionIndex} className="bg-background/50">
                       <CardHeader>
                         <CardTitle className="text-base font-medium">
-                          Q{questionIndex + 1}: {question.text}
+                          Q{questionIndex + 1}: {question.question} {/* Changed from question.text */}
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
@@ -134,7 +140,7 @@ export default function PreviewQuestionnairePage() {
                           {question.options.map((option: AnswerOption, optionIndex: number) => (
                             <li key={option.id || optionIndex} className="flex items-center justify-between p-2 border rounded-md bg-card">
                               <span>{String.fromCharCode(97 + optionIndex)}) {option.text}</span>
-                              <Badge variant="secondary" className="font-mono">Points: {option.points}</Badge>
+                              <Badge variant="secondary" className="font-mono">Score: {option.score}</Badge> {/* Changed from option.points */}
                             </li>
                           ))}
                         </ul>

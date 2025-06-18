@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -7,15 +8,15 @@ import { collection, getDocs, query, Timestamp } from 'firebase/firestore';
 import type { CustomerResponse, QuestionnaireVersion, Question, Section as SectionType, AnswerOption } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from '@/components/ui/label';
 import { BarChartHorizontal, FileSearch, AlertTriangle } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from "@/hooks/use-toast";
-import { Label } from '@/components/ui/label';
 
 interface SectionAverageScore {
-  name: string;
+  name: string; // Section name
   averageScore: number;
   responsesCount: number;
 }
@@ -57,7 +58,7 @@ export default function AdminReportsPage() {
         if (fetchedVersions.length > 0) {
           // Sort versions by creation date, newest first, then select the first one
           const sortedVersions = fetchedVersions.sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime());
-          setSelectedVersionId(sortedVersions[0].id); 
+          setSelectedVersionId(sortedVersions[0].id);
         }
 
       } catch (error) {
@@ -81,40 +82,54 @@ export default function AdminReportsPage() {
     const relevantResponses = responses.filter(r => r.questionnaireVersionId === selectedVersionId);
     const totalCompleted = relevantResponses.length;
 
-    const questionDetailsMap = new Map<string, { sectionId: string, sectionTitle: string, options: Map<string, number> }>();
+    // Map: questionId -> { sectionId, sectionName, optionsMap (optionId -> score) }
+    const questionDetailsMap = new Map<string, { sectionId: string, sectionName: string, options: Map<string, number> }>();
     selectedQuestionnaireVersion.sections.forEach(section => {
       section.questions.forEach(question => {
         const optionsMap = new Map<string, number>();
-        question.options.forEach(opt => optionsMap.set(opt.id, opt.points));
-        questionDetailsMap.set(question.id, { sectionId: section.id, sectionTitle: section.title, options: optionsMap });
+        question.options.forEach(opt => optionsMap.set(opt.id, opt.score)); // Use opt.score
+        questionDetailsMap.set(question.id, { sectionId: section.id, sectionName: section.name, options: optionsMap }); // Use section.name
       });
     });
     
-    const sectionScoresData: Record<string, { totalPoints: number; answerCount: number; responseCount: Set<string> }> = {};
+    const sectionScoresData: Record<string, { totalScore: number; answerCount: number; responseCount: Set<string> }> = {};
 
     selectedQuestionnaireVersion.sections.forEach(section => {
-      sectionScoresData[section.id] = { totalPoints: 0, answerCount: 0, responseCount: new Set() };
+      sectionScoresData[section.id] = { totalScore: 0, answerCount: 0, responseCount: new Set() };
     });
     
     relevantResponses.forEach(response => {
-      Object.entries(response.responses).forEach(([questionId, optionId]) => {
+      Object.entries(response.responses).forEach(([questionId, optionId]) => { // optionId is a string
         const details = questionDetailsMap.get(questionId);
         if (details) {
-          const points = details.options.get(optionId as string) || 0; 
-          sectionScoresData[details.sectionId].totalPoints += points;
-          sectionScoresData[details.sectionId].answerCount += 1;
+          const score = details.options.get(optionId as string) || 0;
+          sectionScoresData[details.sectionId].totalScore += score;
+          sectionScoresData[details.sectionId].answerCount += 1; // Count each answer contributing to score
           sectionScoresData[details.sectionId].responseCount.add(response.id);
         }
       });
     });
-
+    
     const sectionAverages: SectionAverageScore[] = selectedQuestionnaireVersion.sections.map(section => {
       const data = sectionScoresData[section.id];
-      
+      // Calculate average score for questions answered within this section.
+      // If a section had questions but none were answered in any response, answerCount could be 0.
+      const uniqueResponsesForSection = data.responseCount.size;
+      // We need to average the score for each question, then average those for the section, or average total points by total questions answered in section.
+      // For simplicity, let's average total points achieved in a section across all questions answered in that section.
+      // If a section had 2 questions, and one user answered Q1 (3pts) and another Q2 (4pts)
+      // totalScore = 7, answerCount = 2. Avg = 3.5.
+      // If one user answered Q1 (3pts) and Q2 (4pts). totalScore = 7, answerCount = 2. Avg = 3.5.
+      // This seems like average score per question answered within the section.
+      // A different metric could be: (Total score for section / number of questions in section) / number of unique responses.
+      // Let's stick to: Total accumulated score for the section / Total number of questions answered in that section across all responses.
+      // This means if hard questions are rarely answered, their high scores don't inflate average if not answered.
+      // If a question has 0 points for an option, it still counts as an answer.
+
       return {
-        name: section.title,
-        averageScore: data.answerCount > 0 ? parseFloat((data.totalPoints / data.answerCount).toFixed(2)) : 0,
-        responsesCount: data.responseCount.size,
+        name: section.name, // Use section.name
+        averageScore: data.answerCount > 0 ? parseFloat((data.totalScore / data.answerCount).toFixed(2)) : 0,
+        responsesCount: uniqueResponsesForSection, // How many unique responses contributed to this section's scores
       };
     });
     
@@ -125,8 +140,8 @@ export default function AdminReportsPage() {
 
   const chartConfig = {
     averageScore: {
-      label: "Avg. Score",
-      color: "hsl(var(--chart-1))",
+      label: "Avg. Score per Answer", // Clarified label
+      color: "hsl(var(--chart-2))", // Use a different chart color
     },
   } satisfies import("@/components/ui/chart").ChartConfig;
 
@@ -180,19 +195,38 @@ export default function AdminReportsPage() {
                 </CardTitle>
                 <CardDescription>
                   For questionnaire: {selectedQuestionnaireVersion.name} (Total Submissions: {reportData.totalCompleted})
+                  <br />
+                  Displaying average score achieved per question answered within each section.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {reportData.sectionAverages.length > 0 ? (
                   <ChartContainer config={chartConfig} className="h-[400px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={reportData.sectionAverages} layout="vertical" margin={{ right: 30, left: 120 }}> {/* Increased left margin */}
+                      <BarChart data={reportData.sectionAverages} layout="vertical" margin={{ right: 30, left: 20, bottom: 5, top: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis type="number" />
-                        <YAxis dataKey="name" type="category" width={150} tick={{ fontSize: 12, dy: 5 }} interval={0} />
-                        <Tooltip content={<ChartTooltipContent />} />
+                        <YAxis 
+                            dataKey="name" 
+                            type="category" 
+                            width={180} // Increased width for longer section names
+                            tick={{ fontSize: 12, dy: 2 }} 
+                            interval={0} 
+                        />
+                        <Tooltip
+                            content={<ChartTooltipContent 
+                                formatter={(value, name, props) => {
+                                    if (name === "averageScore" && props.payload) {
+                                        const responsesCount = props.payload.responsesCount;
+                                        return [`${value} (from ${responsesCount} responses)`, chartConfig.averageScore.label];
+                                    }
+                                    return [value, name];
+                                }}
+                            />}
+                            cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }}
+                         />
                         <Legend content={<ChartLegendContent />} />
-                        <Bar dataKey="averageScore" fill="var(--color-averageScore)" radius={4} />
+                        <Bar dataKey="averageScore" fill="var(--color-averageScore)" radius={[0, 6, 6, 0]} barSize={25} />
                       </BarChart>
                     </ResponsiveContainer>
                   </ChartContainer>

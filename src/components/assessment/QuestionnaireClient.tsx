@@ -8,8 +8,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge"; // Added import for Badge
-import { AlertCircle, CheckCircle, Save, Send, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { AlertCircle, CheckCircle, Save, Send, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import {
@@ -115,16 +115,16 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
     setIsLoading(true);
     try {
       // Create final response document
-      // TODO: Add score calculation here
+      // Score calculation will be done on the reports page for now, or can be added here if needed.
       const responseDoc = {
         linkId: linkId,
         customerId: customerLink.customerId,
         questionnaireVersionId: questionnaire.id,
         questionnaireVersionName: questionnaire.name,
         submittedAt: serverTimestamp(),
-        responses: answers,
-        areaScores: {}, // Placeholder for calculated scores
-        questionScores: {}, // Placeholder for calculated scores
+        responses: answers, // question.id -> option.id
+        areaScores: {}, // Placeholder for calculated scores (by section)
+        questionScores: {}, // Placeholder for calculated scores (by question)
       };
       // Using linkId as responseId for simplicity, or generate a new one
       await setDoc(doc(db, 'customerResponses', linkId), responseDoc);
@@ -163,8 +163,14 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
       {currentSection && (
         <Card key={currentSection.id} className="shadow-xl animate-subtle-slide-in" style={{animationDelay: '0.3s'}}>
           <CardHeader>
-            <CardTitle className="text-xl font-semibold">{currentSectionIndex + 1}. {currentSection.title}</CardTitle>
+            <CardTitle className="text-xl font-semibold">{currentSectionIndex + 1}. {currentSection.name}</CardTitle> {/* Changed from title */}
             {currentSection.description && <CardDescription className="mt-1">{currentSection.description}</CardDescription>}
+             {currentSection.instructions && (
+                <div className="flex items-start gap-2 p-3 my-2 border border-blue-200 bg-blue-50/50 rounded-md text-sm text-blue-700">
+                    <Info className="h-5 w-5 mt-0.5 shrink-0 text-blue-600" />
+                    <p>{currentSection.instructions}</p>
+                </div>
+            )}
           </CardHeader>
           <CardContent className="space-y-6">
             {currentSection.questions.map((question, qIndex) => {
@@ -172,7 +178,7 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
                 return (
                   <div key={question.id} className="py-4 border-b last:border-b-0">
                     <p className="font-medium mb-3 text-foreground/90">
-                      {qIndex + 1}. {question.text}
+                      {qIndex + 1}. {question.question} {/* Changed from text */}
                       {!answers[question.id] && <span className="text-destructive ml-1">*</span>}
                     </p>
                     <RadioGroup
@@ -238,4 +244,3 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
     </div>
   );
 }
-

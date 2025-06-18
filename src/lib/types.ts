@@ -2,34 +2,42 @@
 export interface AnswerOption {
   id: string;
   text: string;
-  points: number;
+  score: number; // Changed from points
 }
 
 export interface Question {
   id: string;
-  text: string;
+  question: string; // Changed from text
   options: AnswerOption[];
 }
 
 export interface Section {
   id: string;
-  title: string;
+  name: string; // Changed from title
   description?: string;
+  instructions?: string; // Added
   questions: Question[];
-  weight: number; 
+  weight: number;
 }
 
 export interface QuestionnaireVersion {
-  id: string; 
-  name: string;
-  createdAt: Date; 
+  id: string;
+  name: string; // This is the version name (e.g., "Q3 Wellness Survey")
+  createdAt: Date;
   isActive: boolean;
   sections: Section[];
 }
 
+// Represents the structure of the JSON file being uploaded
 export interface QuestionnaireUploadData {
-  versionName: string;
-  sections: Array<Omit<Section, 'id'> & { tempId?: string, questions: Array<Omit<Question, 'id'> & { tempId?: string, options: Array<Omit<AnswerOption, 'id'> & { tempId?: string }> }> }>;
+  versionName?: string; // Optional: Can be in JSON or entered in UI
+  sections: Array<Omit<Section, 'id'> & { // Expects name, description, instructions, questions, weight
+    tempId?: string,
+    questions: Array<Omit<Question, 'id'> & { // Expects question, options
+      tempId?: string,
+      options: Array<Omit<AnswerOption, 'id'> & { tempId?: string }> // Expects text, score
+    }>
+  }>;
 }
 
 export interface Customer {
@@ -40,17 +48,17 @@ export interface Customer {
 }
 
 export interface CustomerLink {
-  id: string; 
-  customerId: string; 
+  id: string;
+  customerId: string;
   customerName?: string; // Denormalized for easier display
   customerEmail?: string; // Denormalized
   questionnaireVersionId: string;
   questionnaireVersionName?: string; // Denormalized
-  createdAt: Date; 
-  expiresAt: Date; 
+  createdAt: Date;
+  expiresAt: Date;
   status: "pending" | "started" | "completed" | "expired";
-  currentSectionIndex?: number; 
-  responsesInProgress?: Record<string, string>; 
+  currentSectionIndex?: number;
+  responsesInProgress?: Record<string, string>; // question.id -> option.id
 }
 
 export interface UserAnswer {
@@ -61,33 +69,33 @@ export interface UserAnswer {
 
 export interface SectionResult {
   sectionId: string;
-  sectionTitle: string;
+  sectionName: string; // Was sectionTitle
   answers: UserAnswer[];
   rawScoreSum: number;
   maxPossibleScore: number;
-  averageScore: number; 
-  weightedScore?: number; 
+  averageScore: number;
+  weightedScore?: number;
 }
 
 export interface CustomerResponse {
-  id: string; 
+  id: string;
   linkId: string;
   customerId: string;
   questionnaireVersionId: string;
-  questionnaireVersionName: string; 
-  submittedAt: Date; 
-  responses: Record<string, string>; 
-  areaScores: Record<string, { 
-    title: string;
-    averageScore: number; 
-    weightedAverageScore: number; 
+  questionnaireVersionName: string;
+  submittedAt: Date;
+  responses: Record<string, string>; // question.id -> option.id
+  areaScores: Record<string, { // Key is section.id
+    name: string; // Section name
+    averageScore: number;
+    weightedAverageScore: number;
     color: 'red' | 'orange' | 'yellow' | 'green';
   }>;
-  questionScores: Record<string, { 
+  questionScores: Record<string, { // Key is question.id
     score: number;
     color: 'red' | 'orange' | 'yellow' | 'green';
   }>;
-  adminComments?: Record<string, string>; 
+  adminComments?: Record<string, string>;
 }
 
 export interface AdminUser {

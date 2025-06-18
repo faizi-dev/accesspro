@@ -2,58 +2,57 @@
 export interface AnswerOption {
   id: string;
   text: string;
-  score: number; // Changed from points
+  score: number;
 }
 
 export interface Question {
   id: string;
-  question: string; // Changed from text
+  question: string;
   options: AnswerOption[];
 }
 
 export interface Section {
   id: string;
-  name: string; // Changed from title
+  name: string;
   description?: string;
-  instructions?: string; // Added
+  instructions?: string;
   questions: Question[];
   weight: number;
 }
 
 export interface QuestionnaireVersion {
   id: string;
-  name: string; // This is the version name (e.g., "Q3 Wellness Survey")
+  name: string;
   createdAt: Date;
   isActive: boolean;
   sections: Section[];
 }
 
-// Represents the structure of the JSON file being uploaded
 export interface QuestionnaireUploadData {
-  versionName?: string; // Optional: Can be in JSON or entered in UI
-  sections: Array<Omit<Section, 'id'> & { // Expects name, description, instructions, questions, weight
+  versionName?: string;
+  sections: Array<Omit<Section, 'id'> & {
     tempId?: string,
-    questions: Array<Omit<Question, 'id'> & { // Expects question, options
+    questions: Array<Omit<Question, 'id'> & {
       tempId?: string,
-      options: Array<Omit<AnswerOption, 'id'> & { tempId?: string }> // Expects text, score
+      options: Array<Omit<AnswerOption, 'id'> & { tempId?: string }>
     }>
   }>;
 }
 
 export interface Customer {
-  id: string; // Firestore document ID
+  id: string;
   name: string;
   email: string;
-  createdAt: Date; // Or Firebase Timestamp
+  createdAt: Date;
 }
 
 export interface CustomerLink {
   id: string;
   customerId: string;
-  customerName?: string; // Denormalized for easier display
-  customerEmail?: string; // Denormalized
+  customerName?: string;
+  customerEmail?: string;
   questionnaireVersionId: string;
-  questionnaireVersionName?: string; // Denormalized
+  questionnaireVersionName?: string;
   createdAt: Date;
   expiresAt: Date;
   status: "pending" | "started" | "completed" | "expired";
@@ -67,35 +66,36 @@ export interface UserAnswer {
   score: number;
 }
 
-export interface SectionResult {
+// This type is for dynamic calculation in the report view, not stored in Firestore as is.
+export interface CalculatedSectionScore {
   sectionId: string;
-  sectionName: string; // Was sectionTitle
-  answers: UserAnswer[];
-  rawScoreSum: number;
-  maxPossibleScore: number;
-  averageScore: number;
-  weightedScore?: number;
+  sectionName: string;
+  sectionWeight: number;
+  achievedScore: number;
+  maxPossibleScore: number; // Max score for all questions in this section
+  averageScore: number; // Normalized to the typical score range (e.g., 1-4 or 1-5)
+  color: 'text-red-600' | 'text-orange-500' | 'text-yellow-500' | 'text-green-600' | 'text-gray-500';
+  weightedAverageScore: number;
+  numQuestionsInSection: number;
 }
 
+
 export interface CustomerResponse {
-  id: string;
+  id: string; // This will be the same as the linkId
   linkId: string;
   customerId: string;
+  customerName?: string; // Denormalized
+  customerEmail?: string; // Denormalized
   questionnaireVersionId: string;
-  questionnaireVersionName: string;
+  questionnaireVersionName: string; // Denormalized from QuestionnaireVersion at submission
   submittedAt: Date;
   responses: Record<string, string>; // question.id -> option.id
-  areaScores: Record<string, { // Key is section.id
-    name: string; // Section name
-    averageScore: number;
-    weightedAverageScore: number;
-    color: 'red' | 'orange' | 'yellow' | 'green';
-  }>;
-  questionScores: Record<string, { // Key is question.id
-    score: number;
-    color: 'red' | 'orange' | 'yellow' | 'green';
-  }>;
-  adminComments?: Record<string, string>;
+  adminComments?: { // For storing admin-specific comments
+    executiveSummary?: string;
+    [sectionId: string]: string | undefined; // Comments per section
+  };
+  // Calculated scores like areaScores, questionScores are typically computed on-the-fly 
+  // or in a separate, more complex reporting data structure, not directly on this basic response object.
 }
 
 export interface AdminUser {

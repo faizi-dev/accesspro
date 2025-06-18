@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { updateDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { updateDoc, doc, serverTimestamp, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 
 interface QuestionnaireClientProps {
@@ -57,12 +57,14 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
     // Pre-shuffle options for all questions in the current section if not already cached
     const newCache = { ...shuffledOptionsCache };
     let cacheUpdated = false;
-    currentSection.questions.forEach(q => {
-      if (!newCache[q.id]) {
-        newCache[q.id] = shuffleArray(q.options);
-        cacheUpdated = true;
-      }
-    });
+    if (currentSection?.questions) {
+      currentSection.questions.forEach(q => {
+        if (!newCache[q.id]) {
+          newCache[q.id] = shuffleArray(q.options);
+          cacheUpdated = true;
+        }
+      });
+    }
     if (cacheUpdated) {
       setShuffledOptionsCache(newCache);
     }
@@ -114,27 +116,34 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
     }
     setIsLoading(true);
     try {
-      // Create final response document
-      // Score calculation will be done on the reports page for now, or can be added here if needed.
-      const responseDoc = {
+      // Fetch the original customerLink to get customerName and customerEmail
+      const customerLinkRef = doc(db, 'customerLinks', linkId);
+      const customerLinkSnap = await getDoc(customerLinkRef);
+      let fetchedCustomerLinkData: Partial<CustomerLink> = {};
+      if (customerLinkSnap.exists()) {
+        fetchedCustomerLinkData = customerLinkSnap.data() as CustomerLink;
+      }
+
+      const responseDocData = {
         linkId: linkId,
         customerId: customerLink.customerId,
+        customerName: fetchedCustomerLinkData.customerName || customerLink.customerName || "N/A",
+        customerEmail: fetchedCustomerLinkData.customerEmail || customerLink.customerEmail || "N/A",
         questionnaireVersionId: questionnaire.id,
-        questionnaireVersionName: questionnaire.name,
+        questionnaireVersionName: questionnaire.name, // Denormalized from the current questionnaire version
         submittedAt: serverTimestamp(),
-        responses: answers, // question.id -> option.id
-        areaScores: {}, // Placeholder for calculated scores (by section)
-        questionScores: {}, // Placeholder for calculated scores (by question)
+        responses: answers,
+        adminComments: {}, // Initialize adminComments
       };
-      // Using linkId as responseId for simplicity, or generate a new one
-      await setDoc(doc(db, 'customerResponses', linkId), responseDoc);
+      
+      await setDoc(doc(db, 'customerResponses', linkId), responseDocData);
 
       // Update link status to completed
-      const linkRef = doc(db, 'customerLinks', linkId);
-      await updateDoc(linkRef, {
+      const linkRefDoc = doc(db, 'customerLinks', linkId);
+      await updateDoc(linkRefDoc, {
         status: "completed",
-        responsesInProgress: {}, // Clear in-progress answers
-        currentSectionIndex: questionnaire.sections.length, // Mark as past the last section
+        responsesInProgress: {}, 
+        currentSectionIndex: questionnaire.sections.length, 
       });
 
       router.push(`/assessment/${linkId}/completed`);
@@ -163,7 +172,7 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
       {currentSection && (
         <Card key={currentSection.id} className="shadow-xl animate-subtle-slide-in" style={{animationDelay: '0.3s'}}>
           <CardHeader>
-            <CardTitle className="text-xl font-semibold">{currentSectionIndex + 1}. {currentSection.name}</CardTitle> {/* Changed from title */}
+            <CardTitle className="text-xl font-semibold">{currentSectionIndex + 1}. {currentSection.name}</CardTitle>
             {currentSection.description && <CardDescription className="mt-1">{currentSection.description}</CardDescription>}
              {currentSection.instructions && (
                 <div className="flex items-start gap-2 p-3 my-2 border border-blue-200 bg-blue-50/50 rounded-md text-sm text-blue-700">
@@ -178,7 +187,7 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
                 return (
                   <div key={question.id} className="py-4 border-b last:border-b-0">
                     <p className="font-medium mb-3 text-foreground/90">
-                      {qIndex + 1}. {question.question} {/* Changed from text */}
+                      {qIndex + 1}. {question.question}
                       {!answers[question.id] && <span className="text-destructive ml-1">*</span>}
                     </p>
                     <RadioGroup
@@ -207,7 +216,6 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
           <Save className="mr-2 h-4 w-4" /> Save and Quit
         </Button>
         <div className="space-x-3">
-          {/* Previous button is disabled as per requirements */}
           <Button variant="ghost" disabled={true}> 
             <ChevronLeft className="mr-2 h-4 w-4" /> Previous
           </Button>

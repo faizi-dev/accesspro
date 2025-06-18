@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -524,45 +523,40 @@ const sidebarMenuButtonVariants = cva(
   }
 )
 
-type SidebarMenuButtonCombinedProps = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "type"> &
-  Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "type"> & {
-    type?: React.ButtonHTMLAttributes<HTMLButtonElement>["type"];
-    asChild?: boolean; // This is SidebarMenuButton's own asChild prop
-    isActive?: boolean;
-    tooltip?: string | React.ComponentProps<typeof TooltipContent>;
-  } & VariantProps<typeof sidebarMenuButtonVariants>;
-
+export interface SidebarMenuButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    React.AnchorHTMLAttributes<HTMLAnchorElement>,
+    VariantProps<typeof sidebarMenuButtonVariants> {
+  asChild?: boolean; // Does this SidebarMenuButton instance render as a Slot?
+  isActive?: boolean;
+  tooltip?: string | React.ComponentProps<typeof TooltipContent>;
+}
 
 const SidebarMenuButton = React.forwardRef<
-  Element,
-  SidebarMenuButtonCombinedProps
+  HTMLButtonElement | HTMLAnchorElement,
+  SidebarMenuButtonProps
 >(
   (
     {
-      asChild: localAsChildProp = false, // This is SidebarMenuButton's own asChild prop
+      asChild: renderAsSlot, // This is SidebarMenuButton's own asChild prop
       isActive = false,
       variant = "default",
       size = "default",
       tooltip,
       className,
       children,
-      href: directHref, 
-      type, 
-      ...restOfPropsFromCaller 
+      href,
+      type, // Explicitly get type for button
+      ...otherProps // Contains all other props, potentially including `asChild` from a parent Link
     },
     ref
   ) => {
     const { isMobile, state } = useSidebar();
 
-    const effectiveHref = directHref || (restOfPropsFromCaller as any).href;
-    const Comp = localAsChildProp ? Slot : effectiveHref ? "a" : "button";
+    const Comp = renderAsSlot ? Slot : href ? "a" : "button";
 
-    // Remove 'asChild' if it was passed down from a parent Link
-    // 'localAsChildProp' is handled by the 'Comp' variable assignment above.
-    const { asChild: asChildFromParentLink, ...domSafeProps } = restOfPropsFromCaller as any;
-
-    const finalProps: Record<string, any> = {
-      ...domSafeProps,
+    const elementProps: any = {
+      ...otherProps,
       ref,
       "data-sidebar": "menu-button",
       "data-size": size,
@@ -571,22 +565,31 @@ const SidebarMenuButton = React.forwardRef<
     };
 
     if (Comp === "a") {
-      finalProps.href = effectiveHref;
-    } else if (Comp === "button" && !localAsChildProp) {
-      finalProps.type = type || "button";
+      elementProps.href = href;
+    } else if (Comp === "button" && !renderAsSlot) {
+      // Ensure type is set for button, defaulting to "button" if not specified.
+      // The 'type' prop from HTMLButtonAttributes is already in otherProps if passed.
+      elementProps.type = type || "button";
     }
     
-    const element = React.createElement(Comp, finalProps, children);
+    // CRITICAL: If Comp is a DOM element ('a' or 'button'),
+    // ensure 'asChild' (which might have come from a parent Link) is NOT passed to it.
+    // The 'renderAsSlot' prop (this component's own asChild) is handled by `Comp = renderAsSlot ? Slot : ...`
+    if (Comp === "a" || Comp === "button") {
+        delete elementProps.asChild;
+    }
     
+    const buttonElementNode = React.createElement(Comp, elementProps, children);
+
     if (!tooltip) {
-      return element;
+      return buttonElementNode;
     }
 
     const tooltipContentProps = typeof tooltip === "string" ? { children: tooltip } : tooltip;
 
     return (
       <Tooltip>
-        <TooltipTrigger asChild>{element}</TooltipTrigger>
+        <TooltipTrigger asChild>{buttonElementNode}</TooltipTrigger>
         <TooltipContent
           side="right"
           align="center"
@@ -598,6 +601,7 @@ const SidebarMenuButton = React.forwardRef<
   }
 );
 SidebarMenuButton.displayName = "SidebarMenuButton"
+
 
 const SidebarMenuAction = React.forwardRef<
   HTMLButtonElement,
@@ -766,5 +770,3 @@ export {
   SidebarTrigger,
   useSidebar,
 }
-
-    

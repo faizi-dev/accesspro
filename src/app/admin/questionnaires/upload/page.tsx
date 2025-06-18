@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, type ChangeEvent, type FormEvent } from 'react';
@@ -88,21 +87,32 @@ export default function UploadQuestionnairePage() {
       }
 
       const processedSections: Section[] = questionnaireData.sections.map((section, sIdx) => {
-        const sectionSlug = generateSlug(section.title?.substring(0,30) || '');
-        const sectionId = section.tempId || `${sectionSlug}-s${sIdx}-${uuidv4().substring(0,8)}`;
+        const sectionSlug = generateSlug(section.title?.substring(0,30) || `section${sIdx}`);
+        const sectionId = section.tempId ? `${section.tempId}_s_${sIdx}_${uuidv4().substring(0,4)}` : `${sectionSlug}-s${sIdx}-${uuidv4().substring(0,8)}`;
+        
         return {
           ...section,
           id: sectionId,
           questions: section.questions.map((question, qIdx) => {
-            const questionSlug = generateSlug(question.text?.substring(0,30) || '');
-            const questionId = question.tempId || `${questionSlug}-s${sIdx}-q${qIdx}-${uuidv4().substring(0,8)}`;
+            const questionSlug = generateSlug(question.text?.substring(0,30) || `question${qIdx}`);
+            // Ensure question ID is unique, even if tempId is provided but not unique across the JSON
+            const questionId = question.tempId 
+              ? `${question.tempId}_s${sIdx}_q${qIdx}_${uuidv4().substring(0,4)}` 
+              : `${questionSlug}-s${sIdx}-q${qIdx}-${uuidv4().substring(0,8)}`;
+            
             return {
               ...question,
               id: questionId,
-              options: question.options.map((option, oIdx) => ({
-                ...option,
-                id: option.tempId || `opt-s${sIdx}-q${qIdx}-o${oIdx}-${uuidv4().substring(0,4)}`, 
-              })),
+              options: question.options.map((option, oIdx) => {
+                const optionSlug = generateSlug(option.text?.substring(0,15) || `option${oIdx}`);
+                const optionId = option.tempId 
+                  ? `${option.tempId}_s${sIdx}_q${qIdx}_o${oIdx}_${uuidv4().substring(0,4)}`
+                  : `${optionSlug}-s${sIdx}-q${qIdx}-o${oIdx}-${uuidv4().substring(0,8)}`;
+                return {
+                  ...option,
+                  id: optionId, 
+                };
+              }),
             };
           }),
         };
@@ -195,7 +205,7 @@ export default function UploadQuestionnairePage() {
             <CardTitle className="text-2xl font-headline">Upload New Questionnaire Version</CardTitle>
         </div>
         <CardDescription>
-          Provide a version name and upload a JSON file containing the questionnaire structure, questions, options, points, and section weights. Ensure 'tempId' fields are unique if provided, otherwise unique IDs will be generated.
+          Provide a version name and upload a JSON file containing the questionnaire structure, questions, options, points, and section weights. If 'tempId' fields are provided, ensure they are reasonably unique as they will be part of the final generated ID. Otherwise, unique IDs will be generated.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -258,5 +268,4 @@ export default function UploadQuestionnairePage() {
       </CardContent>
     </Card>
   );
-
-    
+}

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -12,8 +11,8 @@ import { BarChartHorizontal, FileSearch, AlertTriangle } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from "@/hooks/use-toast"; // Added this import
-import { Label } from '@/components/ui/label'; // Added this import for consistency, it's used below
+import { useToast } from "@/hooks/use-toast";
+import { Label } from '@/components/ui/label';
 
 interface SectionAverageScore {
   name: string;
@@ -68,7 +67,7 @@ export default function AdminReportsPage() {
       setIsLoading(false);
     };
     fetchData();
-  }, [toast]); // Added toast to dependency array as it's used in error handling
+  }, [toast]);
 
   const selectedQuestionnaireVersion = useMemo(() => {
     return questionnaireVersions.find(v => v.id === selectedVersionId);
@@ -101,7 +100,7 @@ export default function AdminReportsPage() {
       Object.entries(response.responses).forEach(([questionId, optionId]) => {
         const details = questionDetailsMap.get(questionId);
         if (details) {
-          const points = details.options.get(optionId as string) || 0; // Ensure optionId is treated as string
+          const points = details.options.get(optionId as string) || 0; 
           sectionScoresData[details.sectionId].totalPoints += points;
           sectionScoresData[details.sectionId].answerCount += 1;
           sectionScoresData[details.sectionId].responseCount.add(response.id);
@@ -111,18 +110,7 @@ export default function AdminReportsPage() {
 
     const sectionAverages: SectionAverageScore[] = selectedQuestionnaireVersion.sections.map(section => {
       const data = sectionScoresData[section.id];
-      // Calculate average score based on unique responses that contributed to answers in this section
-      // This provides average points per question *answered* in this section, across submissions that had answers for this section.
-      const numResponsesForSection = data.responseCount.size > 0 ? data.responseCount.size : 1; // Avoid division by zero
-      const numQuestionsInSection = section.questions.length > 0 ? section.questions.length : 1; // Avoid division by zero
-      // Average score per question in the section
-      const avgScorePerQuestion = data.answerCount > 0 ? (data.totalPoints / data.answerCount) : 0;
       
-      // A more robust average score per section would be sum of (total points for section / number of questions in section) / number of responses
-      // This interpretation: (total points for a section from all responses) / (number of responses * number of questions in section)
-      // But the current one is simpler: sum of points / number of answers made in that section.
-      // Let's stick to the simpler: average points per *answered* question in the section.
-
       return {
         name: section.title,
         averageScore: data.answerCount > 0 ? parseFloat((data.totalPoints / data.answerCount).toFixed(2)) : 0,

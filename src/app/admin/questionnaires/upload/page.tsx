@@ -17,6 +17,7 @@ import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
 
 // Helper to generate a slug-like ID
 const generateSlug = (text: string) => {
+  if (!text) return '';
   return text
     .toLowerCase()
     .replace(/\s+/g, '-') // Replace spaces with -
@@ -82,25 +83,25 @@ export default function UploadQuestionnairePage() {
         throw new Error("No JSON data provided.");
       }
       
-      // Validate basic structure (can be expanded with Zod)
       if (!questionnaireData.sections || !Array.isArray(questionnaireData.sections)) {
         throw new Error("Invalid JSON structure: 'sections' array is missing or not an array.");
       }
 
-      // Assign unique IDs if not present, ensuring slugs for readability
       const processedSections: Section[] = questionnaireData.sections.map((section, sIdx) => {
-        const sectionId = section.tempId || generateSlug(section.title) || `section-${sIdx + 1}-${uuidv4().slice(0,4)}`;
+        const sectionSlug = generateSlug(section.title?.substring(0,30) || '');
+        const sectionId = section.tempId || `${sectionSlug}-s${sIdx}-${uuidv4().substring(0,8)}`;
         return {
           ...section,
           id: sectionId,
           questions: section.questions.map((question, qIdx) => {
-            const questionId = question.tempId || generateSlug(question.text.substring(0,20)) || `q-${sIdx + 1}-${qIdx + 1}-${uuidv4().slice(0,4)}`;
+            const questionSlug = generateSlug(question.text?.substring(0,30) || '');
+            const questionId = question.tempId || `${questionSlug}-s${sIdx}-q${qIdx}-${uuidv4().substring(0,8)}`;
             return {
               ...question,
               id: questionId,
               options: question.options.map((option, oIdx) => ({
                 ...option,
-                id: option.tempId || String.fromCharCode(97 + oIdx), // a, b, c, d
+                id: option.tempId || `opt-s${sIdx}-q${qIdx}-o${oIdx}-${uuidv4().substring(0,4)}`, 
               })),
             };
           }),
@@ -112,7 +113,7 @@ export default function UploadQuestionnairePage() {
       const versionDoc = {
         name: versionName,
         sections: processedSections,
-        isActive: false, // Default to inactive, admin can activate later
+        isActive: false, 
         createdAt: serverTimestamp(),
       };
 
@@ -153,6 +154,32 @@ export default function UploadQuestionnairePage() {
             { "text": "4-5 servings", "points": 3 },
             { "text": "More than 5 servings", "points": 4 }
           ]
+        },
+        {
+          "text": "How often do you engage in physical activity per week?",
+          "options": [
+            { "text": "Rarely or never", "points": 1 },
+            { "text": "1-2 times a week", "points": 2 },
+            { "text": "3-4 times a week", "points": 3 },
+            { "text": "5 or more times a week", "points": 4 }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Mental Wellbeing",
+      "description": "Questions about your stress levels and coping mechanisms.",
+      "weight": 0.4,
+      "questions": [
+        {
+          "text": "How would you rate your average stress level on a scale of 1 to 5 (5 being highest)?",
+          "options": [
+            { "text": "1 - Very Low", "points": 4 },
+            { "text": "2 - Low", "points": 3 },
+            { "text": "3 - Moderate", "points": 2 },
+            { "text": "4 - High", "points": 1 },
+            { "text": "5 - Very High", "points": 0 }
+          ]
         }
       ]
     }
@@ -168,7 +195,7 @@ export default function UploadQuestionnairePage() {
             <CardTitle className="text-2xl font-headline">Upload New Questionnaire Version</CardTitle>
         </div>
         <CardDescription>
-          Provide a version name and upload a JSON file containing the questionnaire structure, questions, options, points, and section weights.
+          Provide a version name and upload a JSON file containing the questionnaire structure, questions, options, points, and section weights. Ensure 'tempId' fields are unique if provided, otherwise unique IDs will be generated.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -178,7 +205,7 @@ export default function UploadQuestionnairePage() {
             <Input
               id="versionName"
               type="text"
-              placeholder="e.g., Q идеалы 2024 Employee Survey"
+              placeholder="e.g., Q ideal 2024 Employee Survey"
               value={versionName}
               onChange={(e) => setVersionName(e.target.value)}
               required
@@ -231,7 +258,5 @@ export default function UploadQuestionnairePage() {
       </CardContent>
     </Card>
   );
-}
 
-// Ensure uuid is installed: npm install uuid
-// And types: npm install --save-dev @types/uuid
+    

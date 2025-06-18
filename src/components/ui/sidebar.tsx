@@ -527,65 +527,56 @@ const sidebarMenuButtonVariants = cva(
 type SidebarMenuButtonCombinedProps = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "type"> &
   Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "type"> & {
     type?: React.ButtonHTMLAttributes<HTMLButtonElement>["type"];
-    asChild?: boolean;
+    asChild?: boolean; // This is SidebarMenuButton's own asChild prop
     isActive?: boolean;
     tooltip?: string | React.ComponentProps<typeof TooltipContent>;
   } & VariantProps<typeof sidebarMenuButtonVariants>;
 
 
 const SidebarMenuButton = React.forwardRef<
-  Element, // Use a more generic Element type for ref when dealing with Slot
+  Element,
   SidebarMenuButtonCombinedProps
 >(
   (
     {
-      asChild: renderAsSlot = false, // This prop determines if SidebarMenuButton itself renders a Slot
+      asChild: localAsChildProp = false, // This is SidebarMenuButton's own asChild prop
       isActive = false,
       variant = "default",
       size = "default",
       tooltip,
       className,
       children,
-      href: directHref, // href passed directly as a prop to SidebarMenuButton
-      type,
-      ...propsFromCaller // All other props, including those from a parent Link (like href, onClick, and Link's own asChild)
+      href: directHref, 
+      type, 
+      ...restOfPropsFromCaller 
     },
     ref
   ) => {
     const { isMobile, state } = useSidebar();
 
-    // Determine the effective href. If Link asChild is used, propsFromCaller.href will exist.
-    const effectiveHref = directHref || (propsFromCaller as any).href;
+    const effectiveHref = directHref || (restOfPropsFromCaller as any).href;
+    const Comp = localAsChildProp ? Slot : effectiveHref ? "a" : "button";
 
-    // Determine the component to render.
-    // If renderAsSlot is true, SidebarMenuButton renders Slot (for its own children).
-    // Otherwise, if effectiveHref is present, it renders 'a'.
-    // Otherwise, it renders 'button'.
-    const Comp = renderAsSlot ? Slot : effectiveHref ? "a" : "button";
+    // Remove 'asChild' if it was passed down from a parent Link
+    // 'localAsChildProp' is handled by the 'Comp' variable assignment above.
+    const { asChild: asChildFromParentLink, ...domSafeProps } = restOfPropsFromCaller as any;
 
-    // Prepare the props to be spread onto Comp.
-    // Crucially, remove any 'asChild' prop that might have come from a parent Link
-    // before spreading onto a DOM element ('a' or 'button').
-    // The 'asChild' prop named 'renderAsSlot' is already handled by the `Comp` variable.
-    const { asChild: asChildFromLink, ...safePropsFromCaller } = propsFromCaller as any;
-    
     const finalProps: Record<string, any> = {
-        ...safePropsFromCaller, // Contains props from Link (like onClick) stripped of asChildFromLink
-        "data-sidebar": "menu-button",
-        "data-size": size,
-        "data-active": isActive,
-        className: cn(sidebarMenuButtonVariants({ variant, size, className })),
+      ...domSafeProps,
+      ref,
+      "data-sidebar": "menu-button",
+      "data-size": size,
+      "data-active": isActive,
+      className: cn(sidebarMenuButtonVariants({ variant, size, className })),
     };
 
     if (Comp === "a") {
-        finalProps.href = effectiveHref;
-    } else if (Comp === "button") {
-        finalProps.type = type || "button";
+      finalProps.href = effectiveHref;
+    } else if (Comp === "button" && !localAsChildProp) {
+      finalProps.type = type || "button";
     }
-    // If Comp is Slot, it will receive effectiveHref (if any) and other props from safePropsFromCaller.
-    // Slot itself will handle prop merging with its direct child.
-
-    const element = React.createElement(Comp, { ref, ...finalProps }, children);
+    
+    const element = React.createElement(Comp, finalProps, children);
     
     if (!tooltip) {
       return element;
@@ -775,3 +766,5 @@ export {
   SidebarTrigger,
   useSidebar,
 }
+
+    

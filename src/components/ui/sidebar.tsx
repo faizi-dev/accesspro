@@ -525,15 +525,13 @@ const sidebarMenuButtonVariants = cva(
 )
 
 export interface SidebarMenuButtonProps
-  extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'type'>,
-    Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> {
-  asChild?: boolean; 
-  isActive?: boolean;
-  tooltip?: string | React.ComponentProps<typeof TooltipContent>;
-  variant?: VariantProps<typeof sidebarMenuButtonVariants>["variant"];
-  size?: VariantProps<typeof sidebarMenuButtonVariants>["size"];
-  href?: string; 
-  type?: string; 
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    React.AnchorHTMLAttributes<HTMLAnchorElement> {
+  asChild?: boolean
+  isActive?: boolean
+  tooltip?: string | React.ComponentProps<typeof TooltipContent>
+  variant?: VariantProps<typeof sidebarMenuButtonVariants>["variant"]
+  size?: VariantProps<typeof sidebarMenuButtonVariants>["size"]
 }
 
 const SidebarMenuButton = React.forwardRef<
@@ -542,58 +540,47 @@ const SidebarMenuButton = React.forwardRef<
 >(
   (
     {
-      asChild: renderAsSlotProp, 
+      asChild: localAsChild,
       isActive = false,
       variant = "default",
       size = "default",
       tooltip,
       className,
       children,
-      href: hrefFromDirectProps, 
-      type: typeFromDirectProps, 
-      ...otherPropsFromCaller 
+      href,
+      ...rest
     },
     ref
   ) => {
-    const { isMobile, state } = useSidebar();
+    const { isMobile, state } = useSidebar()
+    const { asChild: parentAsChild, ...domProps } = rest
 
-    const effectiveHref = hrefFromDirectProps || (otherPropsFromCaller as any).href;
-    const Comp = renderAsSlotProp ? Slot : effectiveHref ? "a" : "button";
+    const Comp = localAsChild ? Slot : href ? "a" : "button"
 
-    const elementProps: Record<string, any> = {
-      ...otherPropsFromCaller,
-      ref,
-      "data-sidebar": "menu-button",
-      "data-size": size,
-      "data-active": isActive,
-      className: cn(sidebarMenuButtonVariants({ variant, size, className })),
-    };
-
-    if (typeof Comp === 'string' && elementProps.asChild) {
-      delete elementProps.asChild;
-    }
-
-    if (Comp === "a") {
-      if (effectiveHref) {
-        elementProps.href = effectiveHref;
-      }
-      delete elementProps.type; 
-    } else if (Comp === "button") {
-      elementProps.type = typeFromDirectProps || (otherPropsFromCaller as any).type || "button";
-      delete elementProps.href; 
-    }
-    
-    const buttonElementNode = React.createElement(Comp, elementProps, children);
+    const buttonElement = (
+      <Comp
+        ref={ref as any}
+        href={href}
+        data-sidebar="menu-button"
+        data-size={size}
+        data-active={isActive}
+        className={cn(sidebarMenuButtonVariants({ variant, size, className }))}
+        {...domProps}
+      >
+        {children}
+      </Comp>
+    )
 
     if (!tooltip) {
-      return buttonElementNode;
+      return buttonElement
     }
 
-    const tooltipContentProps = typeof tooltip === "string" ? { children: tooltip } : tooltip;
+    const tooltipContentProps =
+      typeof tooltip === "string" ? { children: tooltip } : tooltip
 
     return (
       <Tooltip>
-        <TooltipTrigger asChild>{buttonElementNode}</TooltipTrigger>
+        <TooltipTrigger asChild>{buttonElement}</TooltipTrigger>
         <TooltipContent
           side="right"
           align="center"
@@ -601,9 +588,9 @@ const SidebarMenuButton = React.forwardRef<
           {...tooltipContentProps}
         />
       </Tooltip>
-    );
+    )
   }
-);
+)
 SidebarMenuButton.displayName = "SidebarMenuButton"
 
 

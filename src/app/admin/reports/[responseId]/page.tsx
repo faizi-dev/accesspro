@@ -50,6 +50,15 @@ const getHighestPossibleOptionScore = (questions: SectionType['questions']): num
     return Math.max(...questions[0].options.map(opt => opt.score), 0);
 }
 
+// Helper function to get HEX color for DOCX export
+const getScoreHexColor = (score: number): string => {
+  if (score <= 1.5) return 'E53E3E'; // Red
+  if (score > 1.5 && score <= 2.5) return 'DD6B20'; // Orange
+  if (score > 2.5 && score <= 3.5) return 'D69E2E'; // Yellow
+  if (score > 3.5) return '38A169'; // Green
+  return '718096'; // Gray
+};
+
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
@@ -325,9 +334,9 @@ export default function ReportDetailsPage() {
             countAnalysisImageBuffer = Buffer.from(imageDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
         }
         
-        const createHeading = (text: string) => new Paragraph({
+        const createHeading = (text: string, level: HeadingLevel = HeadingLevel.HEADING_2) => new Paragraph({
             text,
-            heading: HeadingLevel.HEADING_2,
+            heading: level,
             spacing: { before: 240, after: 120 },
         });
 
@@ -408,6 +417,83 @@ export default function ReportDetailsPage() {
         }));
         docSections.push(new Paragraph({ text: response.adminComments?.executiveSummary || "No executive summary comments added yet." }));
 
+        // --- Detailed Section Pages ---
+        const barSections = questionnaire.sections.filter(s => s.type === 'bar');
+
+        for (const section of barSections) {
+            docSections.push(new Paragraph({ pageBreakBefore: true }));
+            docSections.push(createHeading(section.name, HeadingLevel.HEADING_2));
+            if (section.description) {
+                docSections.push(new Paragraph({ text: section.description, style: "TOC1" }));
+            }
+
+            // Calculate section average score
+            let achievedScore = 0;
+            let numAnswered = 0;
+            section.questions.forEach(q => {
+                const selectedOptionId = response.responses[q.id];
+                if (!selectedOptionId) return;
+                const selectedOption = q.options.find(opt => opt.id === selectedOptionId);
+                if (selectedOption && typeof selectedOption.score === 'number') {
+                    achievedScore += selectedOption.score;
+                    numAnswered++;
+                }
+            });
+            const sectionAverageScore = numAnswered > 0 ? parseFloat((achievedScore / numAnswered).toFixed(2)) : 0;
+            
+            docSections.push(new Paragraph({
+                children: [
+                    new TextRun({ text: "Area Average Score: ", bold: true }),
+                    new TextRun({ text: sectionAverageScore.toFixed(2), bold: true, color: "5DADE2" })
+                ],
+                spacing: { after: 240 }
+            }));
+
+            docSections.push(createHeading("Question Breakdown", HeadingLevel.HEADING_3));
+
+            for (const question of section.questions) {
+                const selectedOptionId = response.responses[question.id];
+                const selectedOption = question.options.find(opt => opt.id === selectedOptionId);
+                const score = selectedOption?.score ?? 0;
+
+                docSections.push(new Paragraph({
+                    children: [new TextRun({ text: question.question, bold: true })],
+                    spacing: { after: 60 }
+                }));
+                docSections.push(new Paragraph({
+                    children: [new TextRun({ text: `Answer: `, italics: true }), new TextRun({ text: selectedOption?.text ?? "Not answered" })],
+                    spacing: { after: 60 }
+                }));
+                
+                docSections.push(new Paragraph({
+                    children: [
+                        new TextRun({ text: "Score: " }),
+                        new TextRun({
+                            text: score.toFixed(2),
+                            bold: true,
+                            color: getScoreHexColor(score)
+                        })
+                    ]
+                }));
+                
+                docSections.push(new Paragraph({
+                    text: "",
+                    border: { bottom: { color: "auto", space: 1, value: "single", size: 6 } },
+                    spacing: { after: 240, before: 240 }
+                }));
+            }
+
+            docSections.push(createHeading("Analysis & Comments", HeadingLevel.HEADING_3));
+            
+            const dynamicComment = response.dynamicComments?.[section.id] ?? section.comment ?? "No dynamic analysis for this section.";
+            docSections.push(new Paragraph({ text: "Dynamic Analysis", bold: true, spacing: { after: 60 } }));
+            docSections.push(new Paragraph({ text: dynamicComment, spacing: { after: 120 } }));
+
+            const adminComment = response.adminComments?.[section.id] ?? "No admin comments added for this section yet.";
+            docSections.push(new Paragraph({ text: "Admin Comments", bold: true, spacing: { after: 60 } }));
+            docSections.push(new Paragraph({ text: adminComment, spacing: { after: 240 } }));
+        }
+
         const doc = new Document({
             sections: [{
                 children: docSections.filter((s): s is Paragraph | DocxTable => !!s)
@@ -466,7 +552,7 @@ export default function ReportDetailsPage() {
         <div className="space-y-4 pt-2">
             {sortedBarScores.map((area) => (
             <div key={area.sectionId} className="grid grid-cols-12 items-center gap-2 border-b pb-4 last:border-b-0 last:pb-0">
-                <p className="col-span-4 font-medium text-sm self-center" title={area.sectionName}>
+                <p className="col-span-4 font-medium text-sm self-center whitespace-normal" title={area.sectionName}>
                     {area.sectionName}
                 </p>
                 <div className="col-span-7">
@@ -586,7 +672,7 @@ export default function ReportDetailsPage() {
             <CardContent className="space-y-4 pt-2">
               {sortedBarScores.map((area) => (
                 <div key={area.sectionId} className="grid grid-cols-12 items-center gap-2 border-b pb-4 last:border-b-0 last:pb-0">
-                  <p className="col-span-12 sm:col-span-4 font-medium text-sm truncate" title={area.sectionName}>
+                  <p className="col-span-12 sm:col-span-4 font-medium text-sm whitespace-normal" title={area.sectionName}>
                     {area.sectionName}
                   </p>
                   <div className="col-span-12 sm:col-span-5">
@@ -772,5 +858,3 @@ export default function ReportDetailsPage() {
     </div>
   );
 }
-
-    

@@ -17,6 +17,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import Link from 'next/link';
 import { 
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Label as RechartsLabel,
 } from 'recharts';
@@ -140,12 +141,8 @@ export default function ReportDetailsPage() {
 
     questionnaire.sections.forEach((section, index) => {
         const sectionType = section.type;
-        
-        // This logic determines type by index for backward compatibility if `type` field is missing.
-        const effectiveType = sectionType || (index < 7 ? 'bar' : index < 9 ? 'matrix' : 'count');
 
-
-        if (effectiveType === 'bar') {
+        if (sectionType === 'bar') {
             const sectionMaxScore = getHighestPossibleOptionScore(section.questions);
             if (sectionMaxScore > overallHighestScore) {
                 overallHighestScore = sectionMaxScore;
@@ -175,7 +172,7 @@ export default function ReportDetailsPage() {
             });
         }
         
-        else if (effectiveType === 'matrix') {
+        else if (sectionType === 'matrix') {
              const question = section.questions[0];
             if (question) {
                 const selectedOptionId = response.responses[question.id];
@@ -186,7 +183,7 @@ export default function ReportDetailsPage() {
             }
         }
         
-        else if (effectiveType === 'count') {
+        else if (sectionType === 'count') {
             const scoreCounts: Record<string, number> = {};
             section.questions.forEach(q => {
                 const selectedOptionId = response.responses[q.id];
@@ -213,31 +210,34 @@ export default function ReportDetailsPage() {
         }
     });
     
-    // Process collected matrix sections into a single analysis
     const matrixAnalyses: CalculatedMatrixAnalysis[] = [];
-    const xSection = matrixSections.find(s => s.matrix_axis === 'x') || matrixSections[0];
-    const ySection = matrixSections.find(s => s.matrix_axis === 'y') || matrixSections[1];
-
-    if (xSection && ySection) {
-        const xAxisLabel = xSection.name || "X-Axis";
-        const yAxisLabel = ySection.name || "Y-Axis";
-        const matrixData = {
-            sectionId: 'combined-matrix',
-            sectionName: 'Double-Entry Matrix Analysis',
-            xAxisLabel,
-            yAxisLabel,
-            data: [{ 
-                x: xSection.answerScore, 
-                y: ySection.answerScore, 
-                name: 'Assessment Result',
-                parent: { xAxisLabel, yAxisLabel }
-            }],
-        };
-        matrixAnalyses.push(matrixData);
+    if (matrixSections.length >= 2) {
+      const xSection = matrixSections.find(s => s.matrix_axis === 'x');
+      const ySection = matrixSections.find(s => s.matrix_axis === 'y');
+  
+      if (xSection && ySection) {
+          const xAxisLabel = xSection.name || "X-Axis";
+          const yAxisLabel = ySection.name || "Y-Axis";
+          const matrixData = {
+              sectionId: 'combined-matrix',
+              sectionName: 'Double-Entry Matrix Analysis',
+              xAxisLabel,
+              yAxisLabel,
+              data: [{ 
+                  x: xSection.answerScore, 
+                  y: ySection.answerScore, 
+                  name: 'Assessment Result',
+                  parent: { xAxisLabel, yAxisLabel }
+              }],
+          };
+          matrixAnalyses.push(matrixData);
+      }
     }
 
+
     const totalAverageRanking = barScores.reduce((sum, score) => {
-        return sum + (score.weightedAverageScore || 0);
+        const weight = typeof score.sectionWeight === 'number' ? score.sectionWeight : 0;
+        return sum + (score.averageScore * weight);
     }, 0);
     
     return { reportData: { barScores, matrixAnalyses, countAnalyses, totalAverageRanking }, highestPossibleScore: overallHighestScore };
@@ -501,15 +501,15 @@ export default function ReportDetailsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Performance by Area</CardTitle>
-              <CardDescription>Average score for each weighted area, ordered high to low.</CardDescription>
+              <CardDescription>Average score for each weighted area, ordered high to low. Click 'Details' for a per-question breakdown.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 pt-2">
               {sortedBarScores.map((area) => (
-                <div key={area.sectionId} className="grid grid-cols-12 items-center gap-4 border-b pb-4 last:border-b-0 last:pb-0">
+                <div key={area.sectionId} className="grid grid-cols-12 items-center gap-2 border-b pb-4 last:border-b-0 last:pb-0">
                   <p className="col-span-12 sm:col-span-4 font-medium text-sm truncate" title={area.sectionName}>
                     {area.sectionName}
                   </p>
-                  <div className="col-span-10 sm:col-span-6">
+                  <div className="col-span-12 sm:col-span-5">
                     <div className="w-full bg-muted rounded-full h-3">
                       <div
                         className="h-3 rounded-full"
@@ -520,9 +520,14 @@ export default function ReportDetailsPage() {
                       ></div>
                     </div>
                   </div>
-                  <p className={`col-span-2 sm:col-span-2 text-right font-bold ${getScoreTextColorClassName(area.averageScore)}`}>
+                  <p className={`col-span-6 sm:col-span-1 text-right font-bold ${getScoreTextColorClassName(area.averageScore)}`}>
                     {area.averageScore.toFixed(2)}
                   </p>
+                  <div className="col-span-6 sm:col-span-2 text-right">
+                    <Link href={`/admin/reports/${responseId}/${area.sectionId}`}>
+                        <Button variant="outline" size="sm">Details</Button>
+                    </Link>
+                  </div>
                 </div>
               ))}
             </CardContent>

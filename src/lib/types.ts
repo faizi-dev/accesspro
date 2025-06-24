@@ -16,6 +16,7 @@ export interface Section {
   name: string;
   description: string | null;
   instructions: string | null;
+  staticComment: string | null;
   type: 'bar' | 'matrix' | 'count';
   weight: number; // For backward compatibility
   total_score: number | null;
@@ -38,6 +39,7 @@ export interface SectionUpload {
   tempId?: string;
   description?: string;
   instructions?: string;
+  staticComment?: string;
   type?: 'bar' | 'matrix' | 'count';
   weight?: number;
   total_score?: number;

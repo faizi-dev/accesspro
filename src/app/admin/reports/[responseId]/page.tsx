@@ -82,6 +82,7 @@ export default function ReportDetailsPage() {
   const [isDownloading, setIsDownloading] = useState(false);
 
   const matrixChartRef = useRef<HTMLDivElement>(null);
+  const barChartExportRef = useRef<HTMLDivElement>(null);
 
 
   useEffect(() => {
@@ -274,6 +275,8 @@ export default function ReportDetailsPage() {
     }
   };
 
+    const sortedBarScores = [...reportData.barScores].sort((a,b) => b.averageScore - a.averageScore);
+
   const handleExportToDocx = async () => {
     if (!response || !questionnaire) {
         toast({ variant: 'destructive', title: 'Error', description: 'Report data not available for export.' });
@@ -282,11 +285,18 @@ export default function ReportDetailsPage() {
     setIsDownloading(true);
 
     try {
-        let chartImageBuffer: Buffer | undefined;
+        let barChartImageBuffer: Buffer | undefined;
+        if (barChartExportRef.current) {
+            const canvas = await html2canvas(barChartExportRef.current, { backgroundColor: '#FFFFFF', scale: 2 });
+            const imageDataUrl = canvas.toDataURL('image/png');
+            barChartImageBuffer = Buffer.from(imageDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
+        }
+        
+        let matrixChartImageBuffer: Buffer | undefined;
         if (matrixChartRef.current) {
             const canvas = await html2canvas(matrixChartRef.current, { backgroundColor: null });
             const imageDataUrl = canvas.toDataURL('image/png');
-            chartImageBuffer = Buffer.from(imageDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
+            matrixChartImageBuffer = Buffer.from(imageDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
         }
         
         const createHeading = (text: string) => new Paragraph({
@@ -295,7 +305,7 @@ export default function ReportDetailsPage() {
             spacing: { before: 240, after: 120 },
         });
 
-        const docSections: (Paragraph | DocxTable)[] = [];
+        const docSections: (Paragraph | DocxTable | undefined)[] = [];
 
         docSections.push(new Paragraph({
             text: "Executive Summary",
@@ -316,24 +326,28 @@ export default function ReportDetailsPage() {
              }));
         }
         
-        if (reportData.barScores.length > 0) {
+        if (reportData.barScores.length > 0 && barChartImageBuffer) {
             docSections.push(createHeading('Weighted Area Scores'));
-            reportData.barScores.forEach(area => {
-                docSections.push(new Paragraph({
-                    children: [
-                        new TextRun({ text: `${area.sectionName}: `, bold: true }),
-                        new TextRun(area.averageScore.toFixed(2))
-                    ]
-                }));
-            });
+            docSections.push(new Paragraph({
+                children: [
+                    new ImageRun({
+                        data: barChartImageBuffer,
+                        transformation: {
+                            width: 550,
+                            height: (barChartExportRef.current?.clientHeight || 300) * (550 / (barChartExportRef.current?.clientWidth || 800)),
+                        },
+                    }),
+                ],
+                alignment: AlignmentType.CENTER
+            }));
         }
 
-        if (reportData.matrixAnalyses.length > 0 && chartImageBuffer) {
+        if (reportData.matrixAnalyses.length > 0 && matrixChartImageBuffer) {
             docSections.push(createHeading('Double-Entry Matrix Analysis'));
             docSections.push(new Paragraph({
                 children: [
                     new ImageRun({
-                        data: chartImageBuffer,
+                        data: matrixChartImageBuffer,
                         transformation: {
                             width: 500,
                             height: 300,
@@ -386,7 +400,7 @@ export default function ReportDetailsPage() {
 
         const doc = new Document({
             sections: [{
-                children: docSections
+                children: docSections.filter((s): s is Paragraph | DocxTable => !!s)
             }],
         });
 
@@ -434,10 +448,36 @@ export default function ReportDetailsPage() {
   
   const staticExecutiveText = "This executive summary provides a high-level overview of the assessment results. Scores are color-coded for quick identification of strengths and areas for attention. Weighted averages reflect the relative importance of each area as defined in the questionnaire structure.";
 
-  const sortedBarScores = [...reportData.barScores].sort((a,b) => b.averageScore - a.averageScore);
-
   return (
     <div className="space-y-8 p-4 md:p-6 print:p-2">
+      {/* Hidden container for DOCX export of bar charts */}
+      <div ref={barChartExportRef} className="absolute -left-[9999px] top-auto w-[800px] p-4 bg-white text-black">
+        <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Weighted Area Scores</h2>
+        <div className="space-y-4 pt-2">
+            {sortedBarScores.map((area) => (
+            <div key={area.sectionId} className="grid grid-cols-12 items-center gap-2 border-b pb-4 last:border-b-0 last:pb-0">
+                <p className="col-span-4 font-medium text-sm truncate" title={area.sectionName}>
+                {area.sectionName}
+                </p>
+                <div className="col-span-7">
+                <div className="w-full bg-slate-200 rounded-full h-3">
+                    <div
+                    className="h-3 rounded-full"
+                    style={{
+                        width: `${(area.averageScore / highestPossibleScore) * 100}%`,
+                        backgroundColor: getScoreFillColor(area.averageScore),
+                    }}
+                    ></div>
+                </div>
+                </div>
+                <p className={`col-span-1 text-right font-bold ${getScoreTextColorClassName(area.averageScore)}`}>
+                {area.averageScore.toFixed(2)}
+                </p>
+            </div>
+            ))}
+        </div>
+      </div>
+      
       <style jsx global>{`
         @media print {
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }

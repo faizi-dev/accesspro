@@ -14,12 +14,12 @@ export interface Question {
 export interface Section {
   id: string;
   name: string;
-  description?: string;
-  instructions?: string;
-  type?: 'bar' | 'matrix' | 'count'; // More explicit types
+  description: string | null;
+  instructions: string | null;
+  type: 'bar' | 'matrix' | 'count';
   weight: number; // For backward compatibility
-  total_score?: number; // New field for weighting 'bar' type
-  matrix_axis?: 'x' | 'y'; // New field for 'matrix' type
+  total_score: number | null;
+  matrix_axis: 'x' | 'y' | null;
   questions: Question[];
 }
 
@@ -31,16 +31,26 @@ export interface QuestionnaireVersion {
   sections: Section[];
 }
 
+// This defines the shape of the JSON file being uploaded.
+// Optional fields here will be parsed as 'undefined' if missing.
+export interface SectionUpload {
+  name: string;
+  tempId?: string;
+  description?: string;
+  instructions?: string;
+  type?: 'bar' | 'matrix' | 'count';
+  weight?: number;
+  total_score?: number;
+  matrix_axis?: 'x' | 'y';
+  questions: Array<Omit<Question, 'id'> & {
+    tempId?: string,
+    options: Array<Omit<AnswerOption, 'id'> & { tempId?: string }>
+  }>;
+}
+
 export interface QuestionnaireUploadData {
   versionName?: string;
-  sections: Array<Omit<Section, 'id' | 'weight' | 'questions'> & {
-    weight?: number; // Keep for backward compatibility during upload
-    tempId?: string,
-    questions: Array<Omit<Question, 'id'> & {
-      tempId?: string,
-      options: Array<Omit<AnswerOption, 'id'> & { tempId?: string }>
-    }>
-  }>;
+  sections: SectionUpload[];
 }
 
 export interface Customer {

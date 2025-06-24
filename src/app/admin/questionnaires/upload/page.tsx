@@ -5,7 +5,7 @@ import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { db } from '@/lib/firebase/config';
 import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
-import type { QuestionnaireUploadData, Section, Question, AnswerOption } from '@/lib/types';
+import type { QuestionnaireUploadData, Section } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -105,12 +105,12 @@ export default function UploadQuestionnairePage() {
         return {
           id: sectionId,
           name: sectionUpload.name,
-          description: sectionUpload.description,
-          instructions: sectionUpload.instructions,
-          type: sectionUpload.type || 'bar', // Default to bar
-          weight: sectionUpload.weight || 0, // For backward compatibility
-          total_score: sectionUpload.total_score,
-          matrix_axis: sectionUpload.matrix_axis,
+          description: sectionUpload.description || null,
+          instructions: sectionUpload.instructions || null,
+          type: sectionUpload.type || 'bar',
+          weight: sectionUpload.weight || 0,
+          total_score: sectionUpload.total_score ?? null, // Use nullish coalescing to allow 0
+          matrix_axis: sectionUpload.matrix_axis || null,
           questions: sectionUpload.questions.map((questionUpload, qIdx) => {
             const questionSlug = generateSlug(questionUpload.question?.substring(0,30) || `question${qIdx}`);
             const questionId = questionUpload.tempId 
@@ -128,7 +128,7 @@ export default function UploadQuestionnairePage() {
                 return {
                   id: optionId,
                   text: optionUpload.text,
-                  score: optionUpload.score, // Map 'score' from upload to 'score' in internal type
+                  score: optionUpload.score,
                 };
               }),
             };

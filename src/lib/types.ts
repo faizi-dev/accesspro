@@ -76,7 +76,7 @@ export interface CalculatedSectionScore {
   achievedScore: number;
   maxPossibleScore: number; // Max score for all questions in this section
   averageScore: number; // Normalized to the typical score range (e.g., 1-4 or 1-5)
-  color: 'text-red-600' | 'text-orange-500' | 'text-yellow-500' | 'text-green-600' | 'text-gray-500';
+  color: string; // HSL color string for recharts fill
   weightedAverageScore: number;
   numQuestionsInSection: number;
 }
@@ -123,3 +123,5 @@ export interface AdminUser {
   uid: string;
   email: string | null;
 }
+
+    

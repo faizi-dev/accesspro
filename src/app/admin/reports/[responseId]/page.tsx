@@ -16,25 +16,26 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Label as RechartsLabel } from 'recharts';
+import { Bar, BarChart, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Label as RechartsLabel, Cell, LabelList } from 'recharts';
 
 
-// Helper function to determine color based on score
-const getScoreColor = (score: number): CalculatedSectionScore['color'] => {
-  if (score <= 1.5) return 'text-red-600';
-  if (score > 1.5 && score <= 2.5) return 'text-orange-500';
-  if (score > 2.5 && score <= 3.5) return 'text-yellow-500';
-  if (score > 3.5) return 'text-green-600';
-  return 'text-gray-500';
+// Helper function to determine color based on score for recharts fill
+const getScoreFillColor = (score: number): string => {
+  if (score <= 1.5) return 'hsl(var(--chart-5))'; // Red
+  if (score > 1.5 && score <= 2.5) return 'hsl(var(--chart-2))'; // Orange
+  if (score > 2.5 && score <= 3.5) return 'hsl(var(--chart-3))'; // Yellow
+  if (score > 3.5) return 'hsl(var(--chart-4))'; // Green
+  return 'hsl(var(--muted))';
 };
 
-const getScoreBgColor = (score: number) => {
-    if (score <= 1.5) return 'bg-red-500';
-    if (score > 1.5 && score <= 2.5) return 'bg-orange-500';
-    if (score > 2.5 && score <= 3.5) return 'bg-yellow-500';
-    if (score > 3.5) return 'bg-green-500';
-    return 'bg-gray-500';
-}
+// Helper function to determine tailwind text color class based on score
+const getScoreTextColorClassName = (score: number): string => {
+  if (score <= 1.5) return 'text-chart-5';
+  if (score > 1.5 && score <= 2.5) return 'text-chart-2';
+  if (score > 2.5 && score <= 3.5) return 'text-chart-3';
+  if (score > 3.5) return 'text-chart-4';
+  return 'text-muted-foreground';
+};
 
 const getHighestPossibleOptionScore = (options: AnswerOption[]): number => {
     if (!options || options.length === 0) return 4;
@@ -97,17 +98,26 @@ export default function ReportDetailsPage() {
     }
   }, [responseId, router, toast]);
 
-  const reportData = useMemo(() => {
+  const { reportData, highestPossibleScore } = useMemo(() => {
     if (!response || !questionnaire) {
-        return { weightedScores: [], matrixAnalyses: [], countAnalyses: [], totalAverageRanking: 0 };
+        return { reportData: { weightedScores: [], matrixAnalyses: [], countAnalyses: [], totalAverageRanking: 0 }, highestPossibleScore: 4 };
     }
 
     const weightedScores: CalculatedSectionScore[] = [];
     const matrixAnalyses: CalculatedMatrixAnalysis[] = [];
     const countAnalyses: CalculatedCountAnalysis[] = [];
+    let overallHighestScore = 4;
 
     for (const section of questionnaire.sections) {
-        const type = section.type || 'weighted'; // Default to weighted for backward compatibility
+        const type = section.type || 'weighted';
+
+        // Find the highest possible score for normalization in this section
+        if(section.questions.length > 0 && section.questions[0].options.length > 0) {
+            const sectionMaxScore = getHighestPossibleOptionScore(section.questions[0].options);
+            if (sectionMaxScore > overallHighestScore) {
+                overallHighestScore = sectionMaxScore;
+            }
+        }
 
         switch (type) {
             case 'weighted':
@@ -134,7 +144,7 @@ export default function ReportDetailsPage() {
                     achievedScore,
                     maxPossibleScore: maxPossibleScoreInSection,
                     averageScore,
-                    color: getScoreColor(averageScore),
+                    color: getScoreFillColor(averageScore),
                     weightedAverageScore: parseFloat((averageScore * section.weight).toFixed(2)),
                     numQuestionsInSection: section.questions.length,
                 });
@@ -169,20 +179,18 @@ export default function ReportDetailsPage() {
 
             case 'count':
                 const answerCounts: Record<string, number> = {};
-                let totalAnswers = 0;
-
+                
                 section.questions.forEach(q => {
                     const selectedOptionId = response.responses[q.id];
                     const selectedOption = q.options.find(opt => opt.id === selectedOptionId);
                     if (selectedOption) {
                         answerCounts[selectedOption.text] = (answerCounts[selectedOption.text] || 0) + 1;
-                        totalAnswers++;
                     }
                 });
-
+                
                 let mostFrequentAnswers: string[] = [];
                 let maxCount = 0;
-                if (totalAnswers > 0) {
+                if (Object.keys(answerCounts).length > 0) {
                     maxCount = Math.max(...Object.values(answerCounts));
                     mostFrequentAnswers = Object.keys(answerCounts).filter(
                         text => answerCounts[text] === maxCount
@@ -199,13 +207,13 @@ export default function ReportDetailsPage() {
         }
     }
 
-    const totalWeightedScoreSum = weightedScores.reduce((sum, score) => {
+    const totalAverageRanking = weightedScores.reduce((sum, score) => {
         return sum + score.weightedAverageScore;
     }, 0);
     
-    weightedScores.sort((a, b) => b.averageScore - a.averageScore);
+    weightedScores.sort((a, b) => a.averageScore - b.averageScore); // Sort ascending for horizontal bar chart
 
-    return { weightedScores, matrixAnalyses, countAnalyses, totalAverageRanking: totalWeightedScoreSum };
+    return { reportData: { weightedScores, matrixAnalyses, countAnalyses, totalAverageRanking }, highestPossibleScore: overallHighestScore };
 
   }, [response, questionnaire]);
 
@@ -282,42 +290,45 @@ export default function ReportDetailsPage() {
           <CardTitle className="text-xl text-center">Total Average Ranking</CardTitle>
         </CardHeader>
         <CardContent className="text-center">
-            <p className={`text-5xl font-bold ${getScoreColor(reportData.totalAverageRanking)}`}>{reportData.totalAverageRanking.toFixed(2)}</p>
+            <p className={`text-5xl font-bold ${getScoreTextColorClassName(reportData.totalAverageRanking)}`}>{reportData.totalAverageRanking.toFixed(2)}</p>
             <p className="text-sm text-muted-foreground mt-1">Weighted composite score from all scored areas.</p>
         </CardContent>
       </Card>
 
       {reportData.weightedScores.length > 0 && (
-        <section>
-          <h2 className="text-xl font-semibold mb-3 text-primary border-b pb-2">Weighted Area Scores</h2>
-          <p className="text-sm text-muted-foreground mb-4">Areas are ordered by average score (descending). Average score is calculated out of the highest possible score for a single question (e.g., 4 or 5).</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {reportData.weightedScores.map((secScore) => (
-              <Card key={secScore.sectionId} className="shadow-md">
-                <CardHeader>
-                  <CardTitle className="text-lg flex justify-between items-center">
-                    <span>{secScore.sectionName}</span>
-                      <span className={`px-2 py-0.5 text-xs rounded-full font-mono ${getScoreColor(secScore.averageScore)} ${getScoreBgColor(secScore.averageScore).replace('bg-','bg-')}/20`}>
-                        Avg: {secScore.averageScore.toFixed(2)}
-                      </span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="w-full bg-muted rounded-full h-2.5 mb-1">
-                      <div 
-                          className={`h-2.5 rounded-full ${getScoreBgColor(secScore.averageScore)}`} 
-                          style={{ width: `${(secScore.averageScore / getHighestPossibleOptionScore(questionnaire.sections.find(s=>s.id === secScore.sectionId)?.questions[0]?.options || [])) * 100}%` }}
-                      ></div>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                      Achieved: {secScore.achievedScore} / {secScore.maxPossibleScore} (from {secScore.numQuestionsInSection} questions)
-                  </p>
-                  <p className={`text-sm font-medium ${secScore.color}`}>Weighted Average: {secScore.weightedAverageScore.toFixed(2)} (Weight: {secScore.sectionWeight})</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
+        <Card>
+          <CardHeader>
+            <CardTitle>Weighted Area Scores</CardTitle>
+            <CardDescription>Areas are ordered by average score (ascending). The score is calculated out of the highest possible score for a single question (e.g., {highestPossibleScore}).</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={reportData.weightedScores.length * 50}>
+              <BarChart
+                layout="vertical"
+                data={reportData.weightedScores}
+                margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" domain={[0, highestPossibleScore]} />
+                <YAxis dataKey="sectionName" type="category" scale="band" width={150} style={{ fontSize: '12px' }}/>
+                <RechartsTooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--card))', 
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: 'var(--radius)' 
+                  }}
+                  formatter={(value, name, props) => [`${value} (Weighted: ${props.payload.weightedAverageScore})`, props.payload.sectionName]}
+                />
+                <Bar dataKey="averageScore" barSize={20}>
+                   <LabelList dataKey="averageScore" position="right" offset={8} style={{ fill: 'hsl(var(--foreground))', fontSize: '12px' }} />
+                  {reportData.weightedScores.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
       )}
       
       {reportData.matrixAnalyses.length > 0 && (
@@ -431,3 +442,5 @@ export default function ReportDetailsPage() {
     </div>
   );
 }
+
+    

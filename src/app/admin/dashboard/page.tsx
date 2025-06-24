@@ -1,16 +1,58 @@
 
 "use client";
 
+import { useState, useEffect } from 'react';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { FileText, Users, BarChart3, UploadCloud, Settings, ArrowRight } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext'; // To display user info
+import { useAuth } from '@/context/AuthContext';
+import { db } from '@/lib/firebase/config';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
+
 
 export default function AdminDashboardPage() {
   const { user, loading: authLoading } = useRequireAuth();
   const { user: authUser } = useAuth();
+  
+  const [stats, setStats] = useState({
+    activeQuestionnaires: 0,
+    customers: 0,
+    completedAssessments: 0,
+  });
+  const [isStatsLoading, setIsStatsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      setIsStatsLoading(true);
+      try {
+        const activeQuestionnairesQuery = query(collection(db, 'questionnaireVersions'), where("isActive", "==", true));
+        const customersQuery = query(collection(db, 'customers'));
+        const responsesQuery = query(collection(db, 'customerResponses'));
+        
+        const [activeQuestionnairesSnapshot, customersSnapshot, responsesSnapshot] = await Promise.all([
+            getDocs(activeQuestionnairesQuery),
+            getDocs(customersQuery),
+            getDocs(responsesQuery)
+        ]);
+
+        setStats({
+          activeQuestionnaires: activeQuestionnairesSnapshot.size,
+          customers: customersSnapshot.size,
+          completedAssessments: responsesSnapshot.size,
+        });
+
+      } catch (error) {
+        console.error("Failed to fetch platform statistics:", error);
+        // Optionally show a toast message for the error
+      }
+      setIsStatsLoading(false);
+    };
+
+    fetchStats();
+  }, []);
 
 
   if (authLoading || !user) {
@@ -75,18 +117,28 @@ export default function AdminDashboardPage() {
             <CardDescription>A summary of key metrics.</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 bg-secondary/30 rounded-lg text-center">
-                <p className="text-3xl font-bold text-primary">12</p>
-                <p className="text-sm text-muted-foreground">Active Questionnaires</p>
-            </div>
-            <div className="p-4 bg-secondary/30 rounded-lg text-center">
-                <p className="text-3xl font-bold text-primary">150</p>
-                <p className="text-sm text-muted-foreground">Customers Managed</p>
-            </div>
-            <div className="p-4 bg-secondary/30 rounded-lg text-center">
-                <p className="text-3xl font-bold text-primary">85</p>
-                <p className="text-sm text-muted-foreground">Completed Assessments</p>
-            </div>
+           {isStatsLoading ? (
+              <>
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+              </>
+            ) : (
+              <>
+                <div className="p-4 bg-secondary/30 rounded-lg text-center">
+                    <p className="text-3xl font-bold text-primary">{stats.activeQuestionnaires}</p>
+                    <p className="text-sm text-muted-foreground">Active Questionnaires</p>
+                </div>
+                <div className="p-4 bg-secondary/30 rounded-lg text-center">
+                    <p className="text-3xl font-bold text-primary">{stats.customers}</p>
+                    <p className="text-sm text-muted-foreground">Customers Managed</p>
+                </div>
+                <div className="p-4 bg-secondary/30 rounded-lg text-center">
+                    <p className="text-3xl font-bold text-primary">{stats.completedAssessments}</p>
+                    <p className="text-sm text-muted-foreground">Completed Assessments</p>
+                </div>
+              </>
+           )}
         </CardContent>
       </Card>
 

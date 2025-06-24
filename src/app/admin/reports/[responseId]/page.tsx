@@ -138,19 +138,21 @@ export default function ReportDetailsPage() {
             section.questions.forEach(q => {
                 const selectedOptionId = response.responses[q.id];
                 const selectedOption = q.options.find(opt => opt.id === selectedOptionId);
-                if (selectedOption) {
+                if (selectedOption && typeof selectedOption.score === 'number') {
                     achievedScore += selectedOption.score;
                     numAnswered++;
                 }
             });
             const averageScore = numAnswered > 0 ? parseFloat((achievedScore / numAnswered).toFixed(2)) : 0;
+            const sectionWeight = typeof section.weight === 'number' ? section.weight : 0;
+
             weightedScores.push({
                 sectionId: section.id,
                 sectionName: section.name,
-                sectionWeight: section.weight,
+                sectionWeight: sectionWeight,
                 achievedScore,
                 averageScore,
-                weightedAverageScore: parseFloat((averageScore * section.weight).toFixed(2)),
+                weightedAverageScore: parseFloat((averageScore * sectionWeight).toFixed(2)),
             });
         }
         // Sections 8-9 (index 7-8) are MATRIX

@@ -290,6 +290,7 @@ export default function ReportDetailsPage() {
         </CardContent>
       </Card>
 
+      {/* Section for Weighted Scores */}
       {reportData.weightedScores.length > 0 && (
         <Card>
           <CardHeader>
@@ -320,6 +321,7 @@ export default function ReportDetailsPage() {
         </Card>
       )}
       
+      {/* Section for Matrix Analysis */}
       {reportData.matrixAnalyses.length > 0 && (
         <section className="page-break-before">
           <Separator className="my-6" />
@@ -361,6 +363,7 @@ export default function ReportDetailsPage() {
         </section>
       )}
 
+      {/* Section for Count Analysis */}
       {reportData.countAnalyses.length > 0 && (
         <section className="page-break-before">
             <Separator className="my-6" />

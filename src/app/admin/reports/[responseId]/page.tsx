@@ -5,7 +5,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { db } from '@/lib/firebase/config';
-import { doc, getDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, Timestamp, updateDoc } from 'firebase/firestore';
 import type { CustomerResponse, QuestionnaireVersion, Section as SectionType, AnswerOption, CalculatedSectionScore, CalculatedCountAnalysis, CalculatedMatrixAnalysis } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Label as RechartsLabel,
 } from 'recharts';
@@ -48,7 +49,7 @@ const getHighestPossibleOptionScore = (questions: SectionType['questions']): num
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
-    const { xAxisLabel, yAxisLabel } = payload[0].payload.parent;
+    const { xAxisLabel, yAxisLabel } = data.parent;
     return (
       <div className="p-2 bg-card border rounded-md shadow-lg text-card-foreground text-sm">
         <p className="font-bold">{data.name}</p>
@@ -71,6 +72,10 @@ export default function ReportDetailsPage() {
   const [response, setResponse] = useState<CustomerResponse | null>(null);
   const [questionnaire, setQuestionnaire] = useState<QuestionnaireVersion | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isEditingComments, setIsEditingComments] = useState(false);
+  const [executiveSummaryComment, setExecutiveSummaryComment] = useState("");
+  const [isSavingComment, setIsSavingComment] = useState(false);
+
 
   useEffect(() => {
     if (responseId) {
@@ -222,6 +227,36 @@ export default function ReportDetailsPage() {
     return { reportData: { weightedScores, matrixAnalyses, countAnalyses, totalAverageRanking }, highestPossibleScore: overallHighestScore };
 
   }, [response, questionnaire]);
+
+  const handleSaveComments = async () => {
+    if (!responseId) return;
+    setIsSavingComment(true);
+    try {
+      const responseRef = doc(db, 'customerResponses', responseId);
+      await updateDoc(responseRef, {
+        "adminComments.executiveSummary": executiveSummaryComment 
+      });
+
+      setResponse(prevResponse => {
+        if (!prevResponse) return null;
+        return {
+          ...prevResponse,
+          adminComments: {
+            ...prevResponse.adminComments,
+            executiveSummary: executiveSummaryComment
+          }
+        };
+      });
+
+      toast({ title: "Success", description: "Comments saved successfully." });
+      setIsEditingComments(false);
+    } catch (error) {
+      console.error("Error saving comments:", error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to save comments." });
+    } finally {
+      setIsSavingComment(false);
+    }
+  };
 
 
   if (isLoading) {
@@ -437,15 +472,45 @@ export default function ReportDetailsPage() {
                     <p className="text-sm text-muted-foreground italic">{staticExecutiveText}</p>
                 </div>
                 <div>
-                    <h3 className="font-semibold text-md mb-1">Admin Comments</h3>
+                  <h3 className="font-semibold text-md mb-1">Admin Comments</h3>
+                  {isEditingComments ? (
+                    <div className="space-y-2">
+                      <Textarea
+                        value={executiveSummaryComment}
+                        onChange={(e) => setExecutiveSummaryComment(e.target.value)}
+                        placeholder="Enter executive summary comments..."
+                        rows={4}
+                        disabled={isSavingComment}
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setIsEditingComments(false)} disabled={isSavingComment}>
+                          Cancel
+                        </Button>
+                        <Button size="sm" onClick={handleSaveComments} disabled={isSavingComment}>
+                          {isSavingComment ? "Saving..." : "Save Comments"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
                       <div className="p-3 border rounded-md bg-secondary/20 min-h-[60px]">
-                        <p className="text-sm text-secondary-foreground">
-                            {response.adminComments?.executiveSummary || "No executive summary comments added yet."}
+                        <p className="text-sm text-secondary-foreground whitespace-pre-wrap">
+                          {response?.adminComments?.executiveSummary || "No executive summary comments added yet."}
                         </p>
                       </div>
-                    <Button variant="outline" size="sm" className="mt-2 print-hide" disabled> 
-                        <Edit className="mr-2 h-3 w-3"/> Edit Comments
-                    </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 print-hide"
+                        onClick={() => {
+                          setExecutiveSummaryComment(response?.adminComments?.executiveSummary || "");
+                          setIsEditingComments(true);
+                        }}
+                      >
+                        <Edit className="mr-2 h-3 w-3" /> Edit Comments
+                      </Button>
+                    </>
+                  )}
                 </div>
             </CardContent>
         </Card>
@@ -457,3 +522,4 @@ export default function ReportDetailsPage() {
     </div>
   );
 }
+

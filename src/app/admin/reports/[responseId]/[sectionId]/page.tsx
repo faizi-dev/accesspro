@@ -9,11 +9,12 @@ import { doc, getDoc, Timestamp, updateDoc } from 'firebase/firestore';
 import type { CustomerResponse, QuestionnaireVersion, Section as SectionType, AnswerOption } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, AlertCircle, Edit, FileText } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Edit, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import Link from 'next/link';
 
 // Helper function to determine color based on score
 const getScoreFillColor = (score: number): string => {
@@ -117,6 +118,21 @@ export default function SectionDetailPage() {
     const averageScore = numAnswered > 0 ? parseFloat((achievedScore / numAnswered).toFixed(2)) : 0;
     return { sectionAverageScore: averageScore, highestPossibleScore: sectionMaxScore };
   }, [section, response]);
+  
+  const { prevSection, nextSection } = useMemo(() => {
+    if (!questionnaire || !sectionId) {
+      return { prevSection: null, nextSection: null };
+    }
+    const currentSectionIndex = questionnaire.sections.findIndex(s => s.id === sectionId);
+    if (currentSectionIndex === -1) {
+        return { prevSection: null, nextSection: null };
+    }
+    const prev = currentSectionIndex > 0 ? questionnaire.sections[currentSectionIndex - 1] : null;
+    const next = currentSectionIndex < questionnaire.sections.length - 1 ? questionnaire.sections[currentSectionIndex + 1] : null;
+
+    return { prevSection: prev, nextSection: next };
+  }, [questionnaire, sectionId]);
+
 
   const handleSaveDynamicComment = async () => {
     if (!responseId || !sectionId) return;
@@ -162,6 +178,30 @@ export default function SectionDetailPage() {
     }
   };
 
+  const PageNavigation = () => (
+    <div className="flex justify-between items-center">
+        <Button variant="outline" onClick={() => router.push(`/admin/reports/${responseId}`)}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Summary
+        </Button>
+        <div className="flex gap-2">
+            {prevSection ? (
+              <Link href={`/admin/reports/${responseId}/${prevSection.id}`} passHref legacyBehavior>
+                <Button asChild variant="outline"><a href={`/admin/reports/${responseId}/${prevSection.id}`}><ChevronLeft className="mr-2 h-4 w-4" /> Prev</a></Button>
+              </Link>
+            ) : (
+              <Button variant="outline" disabled><ChevronLeft className="mr-2 h-4 w-4" /> Prev</Button>
+            )}
+            {nextSection ? (
+              <Link href={`/admin/reports/${responseId}/${nextSection.id}`} passHref legacyBehavior>
+                <Button asChild variant="outline"><a href={`/admin/reports/${responseId}/${nextSection.id}`}>Next <ChevronRight className="ml-2 h-4 w-4" /></a></Button>
+              </Link>
+            ) : (
+              <Button variant="outline" disabled>Next <ChevronRight className="ml-2 h-4 w-4" /></Button>
+            )}
+        </div>
+    </div>
+  );
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -187,9 +227,7 @@ export default function SectionDetailPage() {
 
   return (
     <div className="space-y-8">
-      <Button variant="outline" onClick={() => router.back()}>
-        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Executive Summary
-      </Button>
+      <PageNavigation />
 
       <Card>
         <CardHeader>
@@ -323,7 +361,12 @@ export default function SectionDetailPage() {
             </div>
         </CardContent>
       </Card>
+      
+      <Separator />
 
+      <PageNavigation />
     </div>
   );
 }
+
+    

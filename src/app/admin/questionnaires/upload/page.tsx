@@ -107,7 +107,7 @@ export default function UploadQuestionnairePage() {
           name: sectionUpload.name,
           description: sectionUpload.description || null,
           instructions: sectionUpload.instructions || null,
-          staticComment: sectionUpload.staticComment || null,
+          comment: sectionUpload.comment || null,
           type: sectionUpload.type || 'bar',
           weight: sectionUpload.weight || 0,
           total_score: sectionUpload.total_score ?? null, // Use nullish coalescing to allow 0
@@ -192,7 +192,7 @@ export default function UploadQuestionnairePage() {
       "name": "Core Competency A",
       "type": "bar",
       "total_score": 0.2,
-      "staticComment": "This is a static analysis for Competency A. It highlights key trends and observations.",
+      "comment": "This is a default analysis for Competency A. It highlights key trends and observations.",
       "questions": [
         {
           "question": "How do you rate competency A?",

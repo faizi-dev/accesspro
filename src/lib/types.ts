@@ -16,7 +16,7 @@ export interface Section {
   name: string;
   description: string | null;
   instructions: string | null;
-  staticComment: string | null;
+  comment: string | null;
   type: 'bar' | 'matrix' | 'count';
   weight: number; // For backward compatibility
   total_score: number | null;
@@ -39,7 +39,7 @@ export interface SectionUpload {
   tempId?: string;
   description?: string;
   instructions?: string;
-  staticComment?: string;
+  comment?: string;
   type?: 'bar' | 'matrix' | 'count';
   weight?: number;
   total_score?: number;
@@ -122,6 +122,9 @@ export interface CustomerResponse {
   questionnaireVersionName: string; // Denormalized from QuestionnaireVersion at submission
   submittedAt: Date;
   responses: Record<string, string>; // question.id -> option.id
+  dynamicComments?: { // Editable comments, initialized from questionnaire
+    [sectionId: string]: string | undefined;
+  };
   adminComments?: { // For storing admin-specific comments
     executiveSummary?: string;
     [sectionId: string]: string | undefined; // Comments per section

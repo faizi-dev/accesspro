@@ -42,6 +42,10 @@ export default function SectionDetailPage() {
   const [section, setSection] = useState<SectionType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
+  const [dynamicComment, setDynamicComment] = useState("");
+  const [isEditingDynamicComment, setIsEditingDynamicComment] = useState(false);
+  const [isSavingDynamicComment, setIsSavingDynamicComment] = useState(false);
+  
   const [adminComment, setAdminComment] = useState("");
   const [isEditingComment, setIsEditingComment] = useState(false);
   const [isSavingComment, setIsSavingComment] = useState(false);
@@ -73,6 +77,8 @@ export default function SectionDetailPage() {
              const currentSection = qData.sections.find(s => s.id === sectionId);
              if (currentSection) {
                setSection(currentSection);
+               const initialDynamicComment = responseData.dynamicComments?.[sectionId] ?? currentSection.comment ?? "";
+               setDynamicComment(initialDynamicComment);
                setAdminComment(responseData.adminComments?.[sectionId] || "");
              } else {
                toast({ variant: 'destructive', title: 'Error', description: 'Section not found in this questionnaire version.' });
@@ -111,6 +117,30 @@ export default function SectionDetailPage() {
     const averageScore = numAnswered > 0 ? parseFloat((achievedScore / numAnswered).toFixed(2)) : 0;
     return { sectionAverageScore: averageScore, highestPossibleScore: sectionMaxScore };
   }, [section, response]);
+
+  const handleSaveDynamicComment = async () => {
+    if (!responseId || !sectionId) return;
+    setIsSavingDynamicComment(true);
+    try {
+        const responseRef = doc(db, 'customerResponses', responseId);
+        await updateDoc(responseRef, {
+            [`dynamicComments.${sectionId}`]: dynamicComment
+        });
+
+        setResponse(prev => {
+            if (!prev) return null;
+            const newDynamicComments = { ...prev.dynamicComments, [sectionId]: dynamicComment };
+            return { ...prev, dynamicComments: newDynamicComments };
+        });
+        toast({ title: "Success", description: "Dynamic analysis saved successfully." });
+        setIsEditingDynamicComment(false);
+    } catch (error) {
+        console.error("Error saving dynamic comment:", error);
+        toast({ variant: "destructive", title: "Error", description: "Failed to save dynamic analysis." });
+    } finally {
+        setIsSavingDynamicComment(false);
+    }
+  };
   
   const handleSaveComment = async () => {
     if (!responseId || !sectionId) return;
@@ -212,14 +242,44 @@ export default function SectionDetailPage() {
           <CardTitle>Analysis & Comments</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-            {section.staticComment && (
-                <div>
-                    <h3 className="font-semibold text-md mb-1">Static Analysis</h3>
-                    <div className="p-3 border rounded-md bg-secondary/20 min-h-[60px]">
-                        <p className="text-sm text-secondary-foreground whitespace-pre-wrap">{section.staticComment}</p>
+            <div>
+              <h3 className="font-semibold text-md mb-1">Dynamic Analysis</h3>
+                {isEditingDynamicComment ? (
+                  <div className="space-y-2">
+                    <Textarea
+                      value={dynamicComment}
+                      onChange={(e) => setDynamicComment(e.target.value)}
+                      placeholder="Enter dynamic analysis for this section..."
+                      rows={4}
+                      disabled={isSavingDynamicComment}
+                    />
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setIsEditingDynamicComment(false)} disabled={isSavingDynamicComment}>
+                        Cancel
+                      </Button>
+                      <Button size="sm" onClick={handleSaveDynamicComment} disabled={isSavingDynamicComment}>
+                        {isSavingDynamicComment ? "Saving..." : "Save Analysis"}
+                      </Button>
                     </div>
-                </div>
-            )}
+                  </div>
+                ) : (
+                  <>
+                    <div className="p-3 border rounded-md bg-secondary/20 min-h-[60px]">
+                      <p className="text-sm text-secondary-foreground whitespace-pre-wrap">
+                        {dynamicComment || "No dynamic analysis for this section."}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => setIsEditingDynamicComment(true)}
+                    >
+                      <Edit className="mr-2 h-3 w-3" /> Edit Analysis
+                    </Button>
+                  </>
+                )}
+            </div>
             <div>
               <h3 className="font-semibold text-md mb-1">Admin Comments</h3>
               {isEditingComment ? (

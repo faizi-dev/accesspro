@@ -127,6 +127,13 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
       if (customerLinkSnap.exists()) {
         fetchedCustomerLinkData = customerLinkSnap.data() as CustomerLink;
       }
+      
+      const dynamicComments: Record<string, string> = {};
+      questionnaire.sections.forEach(section => {
+        if (section.comment) {
+            dynamicComments[section.id] = section.comment;
+        }
+      });
 
       const responseDocData = {
         linkId: linkId,
@@ -137,6 +144,7 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
         questionnaireVersionName: questionnaire.name, // Denormalized from the current questionnaire version
         submittedAt: serverTimestamp(),
         responses: answers,
+        dynamicComments: dynamicComments, // Initialize dynamic comments
         adminComments: {}, // Initialize adminComments
       };
       

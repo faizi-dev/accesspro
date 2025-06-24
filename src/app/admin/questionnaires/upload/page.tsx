@@ -94,8 +94,12 @@ export default function UploadQuestionnairePage() {
           ? `${sectionUpload.tempId}_s_${sIdx}_${uuidv4().substring(0,4)}` 
           : `${sectionSlug}-s${sIdx}-${uuidv4().substring(0,8)}`;
         
-        if (sectionUpload.type === 'weighted' && typeof sectionUpload.weight !== 'number') {
-            throw new Error(`Weighted section "${sectionUpload.name || `at index ${sIdx}`}" is missing a 'weight' or has an invalid one.`);
+        if (sectionUpload.type === 'bar' && typeof sectionUpload.total_score !== 'number') {
+            throw new Error(`Bar section "${sectionUpload.name || `at index ${sIdx}`}" is missing a 'total_score' or has an invalid one.`);
+        }
+        
+        if (sectionUpload.type === 'matrix' && !sectionUpload.matrix_axis) {
+            throw new Error(`Matrix section "${sectionUpload.name || `at index ${sIdx}`}" is missing a 'matrix_axis' property.`);
         }
 
         return {
@@ -103,8 +107,10 @@ export default function UploadQuestionnairePage() {
           name: sectionUpload.name,
           description: sectionUpload.description,
           instructions: sectionUpload.instructions,
-          type: sectionUpload.type || 'weighted', // Default to weighted
-          weight: sectionUpload.weight || 0,
+          type: sectionUpload.type || 'bar', // Default to bar
+          weight: sectionUpload.weight || 0, // For backward compatibility
+          total_score: sectionUpload.total_score,
+          matrix_axis: sectionUpload.matrix_axis,
           questions: sectionUpload.questions.map((questionUpload, qIdx) => {
             const questionSlug = generateSlug(questionUpload.question?.substring(0,30) || `question${qIdx}`);
             const questionId = questionUpload.tempId 
@@ -161,57 +167,60 @@ export default function UploadQuestionnairePage() {
   };
   
   const sampleJson = `{
-  "versionName": "Comprehensive Assessment V4",
+  "versionName": "Dynamic Assessment V5",
   "sections": [
     {
-      "name": "Diet and Wellness",
-      "description": "Eating habits and wellness awareness.",
-      "instructions": "Select the option that best describes you.",
-      "type": "weighted",
-      "weight": 0.4,
+      "name": "Core Competency A",
+      "type": "bar",
+      "total_score": 0.2,
       "questions": [
         {
-          "question": "How many servings of fruits and vegetables do you consume per day?",
+          "question": "How do you rate competency A?",
           "options": [
-            { "text": "Less than 2 servings", "score": 1 },
-            { "text": "2-3 servings", "score": 2 },
-            { "text": "4-5 servings", "score": 3 },
-            { "text": "More than 5 servings", "score": 4 }
+            { "text": "Needs Improvement", "score": 1 },
+            { "text": "Meets Expectations", "score": 2 },
+            { "text": "Exceeds Expectations", "score": 3 },
+            { "text": "Outstanding", "score": 4 }
           ]
         }
       ]
     },
     {
-      "name": "Mental Wellbeing",
-      "description": "Stress levels and coping mechanisms.",
-      "type": "weighted",
-      "weight": 0.6,
+      "name": "Core Competency B",
+      "type": "bar",
+      "total_score": 0.3,
       "questions": [
         {
-          "question": "How would you rate your average stress level (5 is highest)?",
+          "question": "How do you rate competency B?",
           "options": [
-            { "text": "1 - Very Low", "score": 4 },
-            { "text": "2 - Low", "score": 3 },
-            { "text": "3 - Moderate", "score": 2 },
-            { "text": "4 - High", "score": 1 },
-            { "text": "5 - Very High", "score": 0 }
+            { "text": "Needs Improvement", "score": 1 },
+            { "text": "Meets Expectations", "score": 2 },
+            { "text": "Exceeds Expectations", "score": 3 },
+            { "text": "Outstanding", "score": 4 }
           ]
         }
       ]
     },
     {
-      "name": "Effort vs. Impact Matrix",
-      "description": "Plot tasks based on their required effort and expected impact.",
-      "instructions": "Answer the following two questions to plot the item on the matrix.",
+      "name": "Effort Assessment",
+      "description": "Rate the effort required for a key task.",
       "type": "matrix",
-      "weight": 0,
+      "matrix_axis": "x",
       "questions": [
         {
           "question": "Rate the 'Effort' required (1=Low, 5=High)",
           "options": [
             { "text": "1", "score": 1 }, { "text": "2", "score": 2 }, { "text": "3", "score": 3 }, { "text": "4", "score": 4 }, { "text": "5", "score": 5 }
           ]
-        },
+        }
+      ]
+    },
+    {
+      "name": "Impact Assessment",
+      "description": "Rate the impact expected from a key task.",
+      "type": "matrix",
+      "matrix_axis": "y",
+      "questions": [
         {
           "question": "Rate the 'Impact' expected (1=Low, 5=High)",
           "options": [
@@ -221,17 +230,15 @@ export default function UploadQuestionnairePage() {
       ]
     },
     {
-      "name": "Preferred Communication Channel",
-      "description": "Tally of preferred contact methods.",
+      "name": "Tool Preference",
       "type": "count",
-      "weight": 0,
       "questions": [
         {
-          "question": "What is your preferred method for receiving updates?",
+          "question": "Which tool do you prefer for collaboration?",
           "options": [
-            { "text": "Email", "score": 0 },
-            { "text": "SMS/Text Message", "score": 0 },
-            { "text": "Phone Call", "score": 0 }
+            { "text": "Tool A", "score": 1 },
+            { "text": "Tool B", "score": 2 },
+            { "text": "Tool C", "score": 3 }
           ]
         }
       ]
@@ -248,7 +255,7 @@ export default function UploadQuestionnairePage() {
             <CardTitle className="text-2xl font-headline">Upload New Questionnaire Version</CardTitle>
         </div>
         <CardDescription>
-          Provide a version name. Then, upload or paste a JSON file. Sections should have 'name', 'weight', and 'questions'. Optionally include 'description', 'instructions', and 'type' ('weighted', 'matrix', or 'count').
+          Provide a version name, then upload or paste a JSON file. Each section must have a `name` and `type` ('bar', 'matrix', 'count'). `bar` sections need `total_score`. `matrix` sections need `matrix_axis` ('x' or 'y').
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -258,7 +265,7 @@ export default function UploadQuestionnairePage() {
             <Input
               id="versionName"
               type="text"
-              placeholder="e.g., Q3 ideal 2024 Employee Survey"
+              placeholder="e.g., Q3 2024 Dynamic Survey"
               value={versionName}
               onChange={(e) => setVersionName(e.target.value)}
               required
@@ -312,4 +319,3 @@ export default function UploadQuestionnairePage() {
     </Card>
   );
 }
-

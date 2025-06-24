@@ -96,6 +96,7 @@ export default function ReportDetailsPage() {
               submittedAt: (responseSnap.data().submittedAt as Timestamp)?.toDate() || new Date()
           } as CustomerResponse;
           setResponse(responseData);
+          setExecutiveSummaryComment(responseData.adminComments?.executiveSummary || "");
 
           const questionnaireRef = doc(db, 'questionnaireVersions', responseData.questionnaireVersionId);
           const questionnaireSnap = await getDoc(questionnaireRef);
@@ -123,26 +124,28 @@ export default function ReportDetailsPage() {
 
   const { reportData, highestPossibleScore } = useMemo(() => {
     if (!response || !questionnaire) {
-        return { reportData: { weightedScores: [], matrixAnalyses: [], countAnalyses: [], totalAverageRanking: 0 }, highestPossibleScore: 4 };
+        return { reportData: { barScores: [], matrixAnalyses: [], countAnalyses: [], totalAverageRanking: 0 }, highestPossibleScore: 4 };
     }
 
-    const weightedScores: CalculatedSectionScore[] = [];
-    const matrixAnalyses: CalculatedMatrixAnalysis[] = [];
+    const barScores: CalculatedSectionScore[] = [];
+    const matrixSections: (SectionType & { answerScore: number })[] = [];
     const countAnalyses: CalculatedCountAnalysis[] = [];
     let overallHighestScore = 4;
 
-    questionnaire.sections.forEach((section, index) => {
-        const sectionMaxScore = getHighestPossibleOptionScore(section.questions);
-        if (sectionMaxScore > overallHighestScore) {
-            overallHighestScore = sectionMaxScore;
-        }
+    questionnaire.sections.forEach((section) => {
+        const sectionType = section.type || 'bar'; // Default to bar for backward compatibility
 
-        // WEIGHTED: Sections 1-7 (index 0-6)
-        if (index < 7) {
+        if (sectionType === 'bar') {
+            const sectionMaxScore = getHighestPossibleOptionScore(section.questions);
+            if (sectionMaxScore > overallHighestScore) {
+                overallHighestScore = sectionMaxScore;
+            }
+
             let achievedScore = 0;
             let numAnswered = 0;
             section.questions.forEach(q => {
                 const selectedOptionId = response.responses[q.id];
+                if (!selectedOptionId) return;
                 const selectedOption = q.options.find(opt => opt.id === selectedOptionId);
                 if (selectedOption && typeof selectedOption.score === 'number') {
                     achievedScore += selectedOption.score;
@@ -150,9 +153,9 @@ export default function ReportDetailsPage() {
                 }
             });
             const averageScore = numAnswered > 0 ? parseFloat((achievedScore / numAnswered).toFixed(2)) : 0;
-            const sectionWeight = typeof section.weight === 'number' ? section.weight : 0;
+            const sectionWeight = typeof section.total_score === 'number' ? section.total_score : (section.weight || 0);
 
-            weightedScores.push({
+            barScores.push({
                 sectionId: section.id,
                 sectionName: section.name,
                 sectionWeight: sectionWeight,
@@ -162,8 +165,18 @@ export default function ReportDetailsPage() {
             });
         }
         
-        // COUNT: Section 10 (index 9)
-        else if (index === 9) {
+        else if (sectionType === 'matrix') {
+             const question = section.questions[0];
+            if (question) {
+                const selectedOptionId = response.responses[question.id];
+                const selectedOption = question.options.find(opt => opt.id === selectedOptionId);
+                if (selectedOption && typeof selectedOption.score === 'number') {
+                    matrixSections.push({ ...section, answerScore: selectedOption.score });
+                }
+            }
+        }
+        
+        else if (sectionType === 'count') {
             const scoreCounts: Record<string, number> = {};
             section.questions.forEach(q => {
                 const selectedOptionId = response.responses[q.id];
@@ -179,7 +192,7 @@ export default function ReportDetailsPage() {
                 maxCount = Math.max(...Object.values(scoreCounts));
                 mostFrequentScores = Object.keys(scoreCounts)
                     .filter(score => scoreCounts[score] === maxCount)
-                    .map(Number); // Convert string keys back to numbers
+                    .map(Number);
             }
             countAnalyses.push({
                 sectionId: section.id,
@@ -189,46 +202,35 @@ export default function ReportDetailsPage() {
             });
         }
     });
+    
+    // Process collected matrix sections into a single analysis
+    const matrixAnalyses: CalculatedMatrixAnalysis[] = [];
+    const xSection = matrixSections.find(s => s.matrix_axis === 'x');
+    const ySection = matrixSections.find(s => s.matrix_axis === 'y');
 
-    // MATRIX: Combine Sections 8 & 9 (index 7 & 8)
-    if (questionnaire.sections.length > 8 && questionnaire.sections[7]?.questions?.length > 0 && questionnaire.sections[8]?.questions?.length > 0) {
-      const section8 = questionnaire.sections[7]; // X-axis
-      const section9 = questionnaire.sections[8]; // Y-axis
-
-      const qX = section8.questions[0];
-      const qY = section9.questions[0];
-
-      const selectedOptionIdX = response.responses[qX.id];
-      const selectedOptionX = qX.options.find(opt => opt.id === selectedOptionIdX);
-      
-      const selectedOptionIdY = response.responses[qY.id];
-      const selectedOptionY = qY.options.find(opt => opt.id === selectedOptionIdY);
-
-      if (selectedOptionX && selectedOptionY) {
-          const matrixData = {
-              sectionId: 'combined-matrix',
-              sectionName: 'Double-Entry Matrix Analysis',
-              xAxisLabel: section8.name || "Environment Impact",
-              yAxisLabel: section9.name || "Technology Use",
-              data: [{ 
-                  x: selectedOptionX.score, 
-                  y: selectedOptionY.score, 
-                  name: 'Assessment Result',
-                  parent: { xAxisLabel: section8.name || "Environment Impact", yAxisLabel: section9.name || "Technology Use" }
-              }],
-          };
-          matrixAnalyses.push(matrixData);
-      }
+    if (xSection && ySection) {
+        const xAxisLabel = xSection.name || "X-Axis";
+        const yAxisLabel = ySection.name || "Y-Axis";
+        const matrixData = {
+            sectionId: 'combined-matrix',
+            sectionName: 'Double-Entry Matrix Analysis',
+            xAxisLabel,
+            yAxisLabel,
+            data: [{ 
+                x: xSection.answerScore, 
+                y: ySection.answerScore, 
+                name: 'Assessment Result',
+                parent: { xAxisLabel, yAxisLabel }
+            }],
+        };
+        matrixAnalyses.push(matrixData);
     }
 
-
-    const totalAverageRanking = weightedScores.reduce((sum, score) => {
-        const weight = typeof score.sectionWeight === 'number' ? score.sectionWeight : 0;
-        const averageScore = typeof score.averageScore === 'number' ? score.averageScore : 0;
-        return sum + (averageScore * weight);
+    const totalAverageRanking = barScores.reduce((sum, score) => {
+        return sum + (score.weightedAverageScore || 0);
     }, 0);
     
-    return { reportData: { weightedScores, matrixAnalyses, countAnalyses, totalAverageRanking }, highestPossibleScore: overallHighestScore };
+    return { reportData: { barScores, matrixAnalyses, countAnalyses, totalAverageRanking }, highestPossibleScore: overallHighestScore };
 
   }, [response, questionnaire]);
 
@@ -294,7 +296,7 @@ export default function ReportDetailsPage() {
   
   const staticExecutiveText = "This executive summary provides a high-level overview of the assessment results. Scores are color-coded for quick identification of strengths and areas for attention. Weighted averages reflect the relative importance of each area as defined in the questionnaire structure.";
 
-  const sortedWeightedScores = [...reportData.weightedScores].sort((a,b) => b.averageScore - a.averageScore);
+  const sortedBarScores = [...reportData.barScores].sort((a,b) => b.averageScore - a.averageScore);
 
   return (
     <div className="space-y-8 p-4 md:p-6 print:p-2">
@@ -331,7 +333,7 @@ export default function ReportDetailsPage() {
       </Card>
       
       {/* --- TOTAL AVERAGE RANKING --- */}
-      {reportData.weightedScores.length > 0 && (
+      {reportData.barScores.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="text-xl text-center">Total Average Ranking</CardTitle>
@@ -343,8 +345,8 @@ export default function ReportDetailsPage() {
           </Card>
       )}
 
-      {/* --- ZONE 1-7: WEIGHTED AREA SCORES --- */}
-      {reportData.weightedScores.length > 0 && (
+      {/* --- BAR CHART SCORES --- */}
+      {reportData.barScores.length > 0 && (
         <section>
           <Separator className="my-6" />
           <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Weighted Area Scores</h2>
@@ -354,7 +356,7 @@ export default function ReportDetailsPage() {
               <CardDescription>Average score for each weighted area, ordered high to low.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 pt-2">
-              {sortedWeightedScores.map((area) => (
+              {sortedBarScores.map((area) => (
                 <div key={area.sectionId} className="grid grid-cols-12 items-center gap-4 border-b pb-4 last:border-b-0 last:pb-0">
                   <p className="col-span-12 sm:col-span-4 font-medium text-sm truncate" title={area.sectionName}>
                     {area.sectionName}
@@ -380,7 +382,7 @@ export default function ReportDetailsPage() {
         </section>
       )}
       
-      {/* --- ZONE 8-9: MATRIX ANALYSIS --- */}
+      {/* --- MATRIX ANALYSIS --- */}
       {reportData.matrixAnalyses.length > 0 && (
         <section className="page-break-before">
           <Separator className="my-6" />
@@ -423,7 +425,7 @@ export default function ReportDetailsPage() {
         </section>
       )}
 
-      {/* --- ZONE 10: COUNT ANALYSIS --- */}
+      {/* --- COUNT ANALYSIS --- */}
       {reportData.countAnalyses.length > 0 && (
         <section className="page-break-before">
             <Separator className="my-6" />
@@ -525,7 +527,3 @@ export default function ReportDetailsPage() {
     </div>
   );
 }
-
-
-
-    

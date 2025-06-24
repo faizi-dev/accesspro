@@ -115,9 +115,11 @@ export default function PreviewQuestionnairePage() {
             {questionnaire.sections.map((section: SectionType, sectionIndex: number) => (
               <AccordionItem value={`section-${sectionIndex}`} key={section.id || sectionIndex}>
                 <AccordionTrigger className="text-lg font-semibold hover:no-underline">
-                  <div className="flex items-center gap-2">
-                     <span className="text-primary">{sectionIndex + 1}.</span> {section.name} {/* Changed from section.title */}
-                     <Badge variant="outline">Weight: {section.weight}</Badge>
+                  <div className="flex items-center gap-2 flex-wrap">
+                     <span className="text-primary">{sectionIndex + 1}.</span> {section.name}
+                     <Badge variant="outline">Type: {section.type || 'bar'}</Badge>
+                     {section.type === 'bar' && <Badge variant="secondary">Weight: {section.total_score ?? section.weight ?? 0}</Badge>}
+                     {section.type === 'matrix' && <Badge variant="secondary">Axis: {section.matrix_axis}</Badge>}
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="space-y-4 pl-6 pr-2 pt-2">
@@ -132,7 +134,7 @@ export default function PreviewQuestionnairePage() {
                     <Card key={question.id || questionIndex} className="bg-background/50">
                       <CardHeader>
                         <CardTitle className="text-base font-medium">
-                          Q{questionIndex + 1}: {question.question} {/* Changed from question.text */}
+                          Q{questionIndex + 1}: {question.question}
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
@@ -140,7 +142,7 @@ export default function PreviewQuestionnairePage() {
                           {question.options.map((option: AnswerOption, optionIndex: number) => (
                             <li key={option.id || optionIndex} className="flex items-center justify-between p-2 border rounded-md bg-card">
                               <span>{String.fromCharCode(97 + optionIndex)}) {option.text}</span>
-                              <Badge variant="secondary" className="font-mono">Score: {option.score}</Badge> {/* Changed from option.points */}
+                              <Badge variant="secondary" className="font-mono">Score: {option.score}</Badge>
                             </li>
                           ))}
                         </ul>

@@ -16,9 +16,11 @@ export interface Section {
   name: string;
   description?: string;
   instructions?: string;
-  type?: 'weighted' | 'matrix' | 'count'; // Type to determine analysis method
+  type?: 'bar' | 'matrix' | 'count'; // More explicit types
+  weight: number; // For backward compatibility
+  total_score?: number; // New field for weighting 'bar' type
+  matrix_axis?: 'x' | 'y'; // New field for 'matrix' type
   questions: Question[];
-  weight: number; // For 'weighted' type, for others it could be 0
 }
 
 export interface QuestionnaireVersion {
@@ -31,8 +33,8 @@ export interface QuestionnaireVersion {
 
 export interface QuestionnaireUploadData {
   versionName?: string;
-  sections: Array<Omit<Section, 'id' | 'weight'> & {
-    weight?: number;
+  sections: Array<Omit<Section, 'id' | 'weight' | 'questions'> & {
+    weight?: number; // Keep for backward compatibility during upload
     tempId?: string,
     questions: Array<Omit<Question, 'id'> & {
       tempId?: string,
@@ -72,7 +74,7 @@ export interface UserAnswer {
 export interface CalculatedSectionScore {
   sectionId: string;
   sectionName: string;
-  sectionWeight: number;
+  sectionWeight: number; // Will be populated by total_score
   achievedScore: number;
   averageScore: number;
   weightedAverageScore: number;
@@ -120,7 +122,3 @@ export interface AdminUser {
   uid: string;
   email: string | null;
 }
-
-    
-
-    

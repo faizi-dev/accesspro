@@ -82,10 +82,10 @@ export interface CalculatedSectionScore {
 export interface CalculatedCountAnalysis {
   sectionId: string;
   sectionName: string;
-  // An object where key is option.text, and value is its count
-  answerCounts: Record<string, number>;
-  // An array of option texts that are most frequent
-  mostFrequentAnswers: string[];
+  // An object where key is the score, and value is its count
+  scoreCounts: Record<string, number>;
+  // An array of scores that are most frequent
+  mostFrequentScores: number[];
 }
 
 // New type for Matrix analysis
@@ -94,7 +94,7 @@ export interface CalculatedMatrixAnalysis {
   sectionName: string;
   xAxisLabel: string;
   yAxisLabel: string;
-  data: { x: number; y: number; name: string }[];
+  data: { x: number; y: number; name: string, parent: any }[];
 }
 
 
@@ -120,5 +120,7 @@ export interface AdminUser {
   uid: string;
   email: string | null;
 }
+
+    
 
     

@@ -164,25 +164,28 @@ export default function ReportDetailsPage() {
         
         // COUNT: Section 10 (index 9)
         else if (index === 9) {
-            const answerCounts: Record<string, number> = {};
+            const scoreCounts: Record<string, number> = {};
             section.questions.forEach(q => {
                 const selectedOptionId = response.responses[q.id];
                 const selectedOption = q.options.find(opt => opt.id === selectedOptionId);
-                if (selectedOption) {
-                    answerCounts[selectedOption.text] = (answerCounts[selectedOption.text] || 0) + 1;
+                if (selectedOption && typeof selectedOption.score === 'number') {
+                    const scoreKey = String(selectedOption.score);
+                    scoreCounts[scoreKey] = (scoreCounts[scoreKey] || 0) + 1;
                 }
             });
-            let mostFrequentAnswers: string[] = [];
+            let mostFrequentScores: number[] = [];
             let maxCount = 0;
-            if (Object.keys(answerCounts).length > 0) {
-                maxCount = Math.max(...Object.values(answerCounts));
-                mostFrequentAnswers = Object.keys(answerCounts).filter(text => answerCounts[text] === maxCount);
+            if (Object.keys(scoreCounts).length > 0) {
+                maxCount = Math.max(...Object.values(scoreCounts));
+                mostFrequentScores = Object.keys(scoreCounts)
+                    .filter(score => scoreCounts[score] === maxCount)
+                    .map(Number); // Convert string keys back to numbers
             }
             countAnalyses.push({
                 sectionId: section.id,
                 sectionName: section.name,
-                answerCounts,
-                mostFrequentAnswers,
+                scoreCounts,
+                mostFrequentScores,
             });
         }
     });
@@ -205,13 +208,13 @@ export default function ReportDetailsPage() {
           const matrixData = {
               sectionId: 'combined-matrix',
               sectionName: 'Double-Entry Matrix Analysis',
-              xAxisLabel: section8.name,
-              yAxisLabel: section9.name,
+              xAxisLabel: section8.name || "Environment Impact",
+              yAxisLabel: section9.name || "Technology Use",
               data: [{ 
                   x: selectedOptionX.score, 
                   y: selectedOptionY.score, 
                   name: 'Assessment Result',
-                  parent: { xAxisLabel: section8.name, yAxisLabel: section9.name }
+                  parent: { xAxisLabel: section8.name || "Environment Impact", yAxisLabel: section9.name || "Technology Use" }
               }],
           };
           matrixAnalyses.push(matrixData);
@@ -221,7 +224,8 @@ export default function ReportDetailsPage() {
 
     const totalAverageRanking = weightedScores.reduce((sum, score) => {
         const weight = typeof score.sectionWeight === 'number' ? score.sectionWeight : 0;
-        return sum + (score.averageScore * weight);
+        const averageScore = typeof score.averageScore === 'number' ? score.averageScore : 0;
+        return sum + (averageScore * weight);
     }, 0);
     
     return { reportData: { weightedScores, matrixAnalyses, countAnalyses, totalAverageRanking }, highestPossibleScore: overallHighestScore };
@@ -432,17 +436,16 @@ export default function ReportDetailsPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Answer</TableHead>
-
-                                    <TableHead className="text-right">Count</TableHead>
+                                    <TableHead>Score Value</TableHead>
+                                    <TableHead className="text-right">Times Selected</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {Object.entries(analysis.answerCounts).sort(([, a], [, b]) => b - a).map(([text, count]) => (
-                                    <TableRow key={text}>
+                                {Object.entries(analysis.scoreCounts).sort(([, a], [, b]) => b - a).map(([score, count]) => (
+                                    <TableRow key={score}>
                                         <TableCell className="font-medium flex items-center">
-                                            {text}
-                                            {analysis.mostFrequentAnswers.includes(text) && (
+                                            Score: {score}
+                                            {analysis.mostFrequentScores.includes(Number(score)) && (
                                                 <Badge variant="secondary" className="ml-2 bg-yellow-200 text-yellow-800">
                                                     <Star className="h-3 w-3 mr-1"/> Most Frequent
                                                 </Badge>
@@ -523,3 +526,6 @@ export default function ReportDetailsPage() {
   );
 }
 
+
+
+    

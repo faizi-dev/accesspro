@@ -48,11 +48,12 @@ const getHighestPossibleOptionScore = (questions: SectionType['questions']): num
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
+    const { xAxisLabel, yAxisLabel } = payload[0].payload.parent;
     return (
       <div className="p-2 bg-card border rounded-md shadow-lg text-card-foreground text-sm">
         <p className="font-bold">{data.name}</p>
-        <p><strong>Effort:</strong> {data.x}</p>
-        <p><strong>Impact:</strong> {data.y}</p>
+        <p><strong>{xAxisLabel}:</strong> {data.x}</p>
+        <p><strong>{yAxisLabel}:</strong> {data.y}</p>
       </div>
     );
   }
@@ -131,7 +132,7 @@ export default function ReportDetailsPage() {
             overallHighestScore = sectionMaxScore;
         }
 
-        // Sections 1-7 (index 0-6) are WEIGHTED
+        // WEIGHTED: Sections 1-7 (index 0-6)
         if (index < 7) {
             let achievedScore = 0;
             let numAnswered = 0;
@@ -155,30 +156,8 @@ export default function ReportDetailsPage() {
                 weightedAverageScore: parseFloat((averageScore * sectionWeight).toFixed(2)),
             });
         }
-        // Sections 8-9 (index 7-8) are MATRIX
-        else if (index === 7 || index === 8) {
-            if (section.questions.length < 2) {
-                console.warn(`Matrix section "${section.name}" (index ${index}) has fewer than 2 questions and will be skipped.`);
-                return; // continue to next iteration
-            }
-            const q1 = section.questions[0];
-            const q2 = section.questions[1];
-            const selectedOptionId1 = response.responses[q1.id];
-            const selectedOption1 = q1.options.find(opt => opt.id === selectedOptionId1);
-            const selectedOptionId2 = response.responses[q2.id];
-            const selectedOption2 = q2.options.find(opt => opt.id === selectedOptionId2);
-
-            if (selectedOption1 && selectedOption2) {
-                matrixAnalyses.push({
-                    sectionId: section.id,
-                    sectionName: section.name,
-                    xAxisLabel: q1.question,
-                    yAxisLabel: q2.question,
-                    data: [{ x: selectedOption1.score, y: selectedOption2.score, name: section.name }],
-                });
-            }
-        }
-        // Section 10 (index 9) is COUNT
+        
+        // COUNT: Section 10 (index 9)
         else if (index === 9) {
             const answerCounts: Record<string, number> = {};
             section.questions.forEach(q => {
@@ -203,8 +182,41 @@ export default function ReportDetailsPage() {
         }
     });
 
+    // MATRIX: Combine Sections 8 & 9 (index 7 & 8)
+    if (questionnaire.sections.length > 8 && questionnaire.sections[7]?.questions?.length > 0 && questionnaire.sections[8]?.questions?.length > 0) {
+      const section8 = questionnaire.sections[7]; // X-axis
+      const section9 = questionnaire.sections[8]; // Y-axis
+
+      const qX = section8.questions[0];
+      const qY = section9.questions[0];
+
+      const selectedOptionIdX = response.responses[qX.id];
+      const selectedOptionX = qX.options.find(opt => opt.id === selectedOptionIdX);
+      
+      const selectedOptionIdY = response.responses[qY.id];
+      const selectedOptionY = qY.options.find(opt => opt.id === selectedOptionIdY);
+
+      if (selectedOptionX && selectedOptionY) {
+          const matrixData = {
+              sectionId: 'combined-matrix',
+              sectionName: 'Double-Entry Matrix Analysis',
+              xAxisLabel: section8.name,
+              yAxisLabel: section9.name,
+              data: [{ 
+                  x: selectedOptionX.score, 
+                  y: selectedOptionY.score, 
+                  name: 'Assessment Result',
+                  parent: { xAxisLabel: section8.name, yAxisLabel: section9.name }
+              }],
+          };
+          matrixAnalyses.push(matrixData);
+      }
+    }
+
+
     const totalAverageRanking = weightedScores.reduce((sum, score) => {
-        return sum + score.weightedAverageScore;
+        const weight = typeof score.sectionWeight === 'number' ? score.sectionWeight : 0;
+        return sum + (score.averageScore * weight);
     }, 0);
     
     return { reportData: { weightedScores, matrixAnalyses, countAnalyses, totalAverageRanking }, highestPossibleScore: overallHighestScore };
@@ -334,12 +346,12 @@ export default function ReportDetailsPage() {
         <section className="page-break-before">
           <Separator className="my-6" />
           <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Double-Entry Matrix Analysis</h2>
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+           <div className="grid grid-cols-1 gap-6">
            {reportData.matrixAnalyses.map(analysis => (
                <Card key={analysis.sectionId}>
                  <CardHeader>
                     <CardTitle className="text-lg">{analysis.sectionName}</CardTitle>
-                    <CardDescription>A visual plot of the responses for this matrix.</CardDescription>
+                    <CardDescription>A visual plot of {analysis.xAxisLabel} vs. {analysis.yAxisLabel}.</CardDescription>
                  </CardHeader>
                  <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
@@ -445,5 +457,3 @@ export default function ReportDetailsPage() {
     </div>
   );
 }
-
-    

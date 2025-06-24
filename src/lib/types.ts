@@ -6,7 +6,7 @@ export interface AnswerOption {
 }
 
 export interface Question {
-  id: string;
+  id:string;
   question: string;
   options: AnswerOption[];
 }
@@ -16,8 +16,9 @@ export interface Section {
   name: string;
   description?: string;
   instructions?: string;
+  type?: 'weighted' | 'matrix' | 'count'; // Type to determine analysis method
   questions: Question[];
-  weight: number;
+  weight: number; // For 'weighted' type, for others it could be 0
 }
 
 export interface QuestionnaireVersion {
@@ -77,6 +78,16 @@ export interface CalculatedSectionScore {
   color: 'text-red-600' | 'text-orange-500' | 'text-yellow-500' | 'text-green-600' | 'text-gray-500';
   weightedAverageScore: number;
   numQuestionsInSection: number;
+}
+
+// New type for count analysis
+export interface CalculatedCountAnalysis {
+  sectionId: string;
+  sectionName: string;
+  // An object where key is option.text, and value is its count
+  answerCounts: Record<string, number>;
+  // An array of option texts that are most frequent
+  mostFrequentAnswers: string[];
 }
 
 

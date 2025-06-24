@@ -6,27 +6,36 @@ import { useParams, useRouter } from 'next/navigation';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { db } from '@/lib/firebase/config';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
-import type { CustomerResponse, QuestionnaireVersion, Section as SectionType, Question as QuestionType, AnswerOption, CalculatedSectionScore } from '@/lib/types';
+import type { CustomerResponse, QuestionnaireVersion, Section as SectionType, AnswerOption, CalculatedSectionScore, CalculatedCountAnalysis } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, FileText, AlertCircle, Loader2, Edit } from 'lucide-react';
+import { ArrowLeft, FileText, AlertCircle, Edit, Star } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 // Helper function to determine color based on score
 const getScoreColor = (score: number): CalculatedSectionScore['color'] => {
   if (score <= 1.5) return 'text-red-600';
-  if (score <= 2.5) return 'text-orange-500';
-  if (score <= 3.5) return 'text-yellow-500';
+  if (score > 1.5 && score <= 2.5) return 'text-orange-500';
+  if (score > 2.5 && score <= 3.5) return 'text-yellow-500';
   if (score > 3.5) return 'text-green-600';
-  return 'text-gray-500'; // Should not happen if scores are always > 0
+  return 'text-gray-500';
 };
 
-// Helper to find max score for an option array (defaulting to 4 if not findable - adjust if needed)
+const getScoreBgColor = (score: number) => {
+    if (score <= 1.5) return 'bg-red-500';
+    if (score > 1.5 && score <= 2.5) return 'bg-orange-500';
+    if (score > 2.5 && score <= 3.5) return 'bg-yellow-500';
+    if (score > 3.5) return 'bg-green-500';
+    return 'bg-gray-500';
+}
+
 const getHighestPossibleOptionScore = (options: AnswerOption[]): number => {
-    if (!options || options.length === 0) return 4; // Default assumption
+    if (!options || options.length === 0) return 4;
     return Math.max(...options.map(opt => opt.score), 0);
 }
 
@@ -67,7 +76,6 @@ export default function ReportDetailsPage() {
 
           if (!questionnaireSnap.exists()) {
             toast({ variant: 'destructive', title: 'Error', description: 'Associated questionnaire version not found.' });
-            setQuestionnaire(null); // Or handle more gracefully
           } else {
              const qData = questionnaireSnap.data();
              setQuestionnaire({ 
@@ -87,46 +95,92 @@ export default function ReportDetailsPage() {
     }
   }, [responseId, router, toast]);
 
-  const calculatedSectionScores = useMemo((): CalculatedSectionScore[] => {
-    if (!response || !questionnaire) return [];
+  const reportData = useMemo(() => {
+    if (!response || !questionnaire) {
+        return { weightedScores: [], matrixSections: [], countAnalyses: [], totalAverageRanking: 0 };
+    }
 
-    return questionnaire.sections.map(section => {
-      let achievedScore = 0;
-      let maxPossibleScoreInSection = 0;
-      let questionsInThisSectionAnswered = 0;
-      
-      const highestPossibleScorePerQuestion = getHighestPossibleOptionScore(section.questions[0]?.options || []);
+    const weightedScores: CalculatedSectionScore[] = [];
+    const matrixSections: SectionType[] = [];
+    const countAnalyses: CalculatedCountAnalysis[] = [];
 
+    for (const section of questionnaire.sections) {
+        const type = section.type || 'weighted'; // Default to weighted for backward compatibility
 
-      section.questions.forEach(q => {
-        const selectedOptionId = response.responses[q.id];
-        const selectedOption = q.options.find(opt => opt.id === selectedOptionId);
-        if (selectedOption) {
-          achievedScore += selectedOption.score;
-          questionsInThisSectionAnswered++;
+        switch (type) {
+            case 'weighted':
+                let achievedScore = 0;
+                let maxPossibleScoreInSection = 0;
+                
+                section.questions.forEach(q => {
+                    const selectedOptionId = response.responses[q.id];
+                    const selectedOption = q.options.find(opt => opt.id === selectedOptionId);
+                    if (selectedOption) {
+                        achievedScore += selectedOption.score;
+                    }
+                    maxPossibleScoreInSection += Math.max(...q.options.map(opt => opt.score), 0);
+                });
+
+                const averageScore = section.questions.length > 0 
+                    ? parseFloat((achievedScore / section.questions.length).toFixed(2)) 
+                    : 0;
+
+                weightedScores.push({
+                    sectionId: section.id,
+                    sectionName: section.name,
+                    sectionWeight: section.weight,
+                    achievedScore,
+                    maxPossibleScore: maxPossibleScoreInSection,
+                    averageScore,
+                    color: getScoreColor(averageScore),
+                    weightedAverageScore: parseFloat((averageScore * section.weight).toFixed(2)),
+                    numQuestionsInSection: section.questions.length,
+                });
+                break;
+            
+            case 'matrix':
+                matrixSections.push(section);
+                break;
+
+            case 'count':
+                const answerCounts: Record<string, number> = {};
+                let totalAnswers = 0;
+
+                section.questions.forEach(q => {
+                    const selectedOptionId = response.responses[q.id];
+                    const selectedOption = q.options.find(opt => opt.id === selectedOptionId);
+                    if (selectedOption) {
+                        answerCounts[selectedOption.text] = (answerCounts[selectedOption.text] || 0) + 1;
+                        totalAnswers++;
+                    }
+                });
+
+                let mostFrequentAnswers: string[] = [];
+                let maxCount = 0;
+                if (totalAnswers > 0) {
+                    maxCount = Math.max(...Object.values(answerCounts));
+                    mostFrequentAnswers = Object.keys(answerCounts).filter(
+                        text => answerCounts[text] === maxCount
+                    );
+                }
+
+                countAnalyses.push({
+                    sectionId: section.id,
+                    sectionName: section.name,
+                    answerCounts,
+                    mostFrequentAnswers,
+                });
+                break;
         }
-        maxPossibleScoreInSection += Math.max(...q.options.map(opt => opt.score), 0);
-      });
-      
-      // averageScore: raw average of points achieved for questions in this section
-      // For example, if a section has 2 questions, Q1 (score 3/4) and Q2 (score 2/4),
-      // achievedScore = 5. Number of questions = 2. averageScore = 2.5.
-      const averageScore = section.questions.length > 0 
-        ? parseFloat((achievedScore / section.questions.length).toFixed(2)) 
-        : 0;
+    }
 
-      return {
-        sectionId: section.id,
-        sectionName: section.name,
-        sectionWeight: section.weight,
-        achievedScore,
-        maxPossibleScore: maxPossibleScoreInSection,
-        averageScore,
-        color: getScoreColor(averageScore),
-        weightedAverageScore: parseFloat((averageScore * section.weight).toFixed(2)),
-        numQuestionsInSection: section.questions.length,
-      };
-    }).sort((a, b) => b.averageScore - a.averageScore); // Sort by average score descending for Zones 1-7
+    const totalAverageRanking = weightedScores.reduce((sum, score) => {
+        return sum + (score.averageScore * score.sectionWeight);
+    }, 0);
+    
+    weightedScores.sort((a, b) => b.averageScore - a.averageScore);
+
+    return { weightedScores, matrixSections, countAnalyses, totalAverageRanking };
 
   }, [response, questionnaire]);
 
@@ -159,9 +213,8 @@ export default function ReportDetailsPage() {
       </div>
     );
   }
-
+  
   const staticExecutiveText = "This executive summary provides a high-level overview of the assessment results. Scores are color-coded for quick identification of strengths and areas for attention. Weighted averages reflect the relative importance of each area as defined in the questionnaire structure.";
-
 
   return (
     <div className="space-y-8 p-4 md:p-6 print:p-2">
@@ -195,86 +248,137 @@ export default function ReportDetailsPage() {
             Submitted: {format(response.submittedAt, 'PPP p')}
           </CardDescription>
         </CardHeader>
-        <Separator className="my-6" />
-
-        <CardContent className="space-y-6">
-          <section>
-            <h2 className="text-xl font-semibold mb-3 text-primary border-b pb-2">Area Scores (Zones 1-7)</h2>
-            <p className="text-sm text-muted-foreground mb-4">Areas are ordered by average score (descending). Average score is calculated out of the highest possible score for a single question (e.g., 4 or 5).</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {calculatedSectionScores.map((secScore) => (
-                <Card key={secScore.sectionId} className="shadow-md">
-                  <CardHeader>
-                    <CardTitle className="text-lg flex justify-between items-center">
-                      <span>{secScore.sectionName}</span>
-                       <span className={`px-2 py-0.5 text-xs rounded-full font-mono ${secScore.color.replace('text-', 'bg-').replace('-600', '-100').replace('-500','-100')} ${secScore.color}`}>
-                         Avg: {secScore.averageScore.toFixed(2)}
-                       </span>
-                  </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                     <div className="w-full bg-muted rounded-full h-2.5 mb-1">
-                        <div 
-                            className={`h-2.5 rounded-full ${secScore.color.replace('text-', 'bg-')}`} 
-                            style={{ width: `${(secScore.averageScore / getHighestPossibleOptionScore(questionnaire.sections.find(s=>s.id === secScore.sectionId)?.questions[0]?.options || [])) * 100}%` }}
-                        ></div>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                        Achieved: {secScore.achievedScore} / {secScore.maxPossibleScore} (from {secScore.numQuestionsInSection} questions)
-                    </p>
-                    <p className={`text-sm font-medium ${secScore.color}`}>Weighted Average: {secScore.weightedAverageScore.toFixed(2)} (Weight: {secScore.sectionWeight})</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </section>
-          
-          <Separator className="my-6" />
-
-          <section>
-            <h2 className="text-xl font-semibold mb-3 text-primary border-b pb-2">Additional Analysis (Zones 8-10)</h2>
-            <Card className="bg-muted/30 p-4">
-                <p className="text-muted-foreground text-sm">
-                    <strong>Zone 8 & 9 (Double-entry Visual Matrix):</strong> Details for these zones, including the visual matrix, will be implemented in a future update.
-                </p>
-                <Separator className="my-3"/>
-                <p className="text-muted-foreground text-sm">
-                    <strong>Zone 10 (Count-based Analysis):</strong> Detailed count-based analysis of answer selections will be implemented in a future update.
-                </p>
-            </Card>
-          </section>
-
-          <Separator className="my-6" />
-          
-          <section>
-            <h2 className="text-xl font-semibold mb-3 text-primary border-b pb-2">Summary & Comments</h2>
-            <Card>
-                <CardContent className="pt-6 space-y-4">
-                    <div>
-                        <h3 className="font-semibold text-md mb-1">General Observations</h3>
-                        <p className="text-sm text-muted-foreground italic">{staticExecutiveText}</p>
-                    </div>
-                    <div>
-                        <h3 className="font-semibold text-md mb-1">Admin Comments</h3>
-                         <div className="p-3 border rounded-md bg-secondary/20 min-h-[60px]">
-                            <p className="text-sm text-secondary-foreground">
-                                {response.adminComments?.executiveSummary || "No executive summary comments added yet."}
-                            </p>
-                         </div>
-                        {/* Placeholder for editing comments - to be implemented later */}
-                        <Button variant="outline" size="sm" className="mt-2 print-hide" disabled> 
-                            <Edit className="mr-2 h-3 w-3"/> Edit Comments
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
-          </section>
-
-        </CardContent>
-        <CardFooter className="print-hide">
-            <p className="text-xs text-muted-foreground">Full report export to PDF/Word will be available in a future update. Use browser print for a basic version.</p>
-        </CardFooter>
       </Card>
+      
+      <Separator className="my-6" />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl text-center">Total Average Ranking</CardTitle>
+        </CardHeader>
+        <CardContent className="text-center">
+            <p className={`text-5xl font-bold ${getScoreColor(reportData.totalAverageRanking)}`}>{reportData.totalAverageRanking.toFixed(2)}</p>
+            <p className="text-sm text-muted-foreground mt-1">Weighted composite score from all scored areas.</p>
+        </CardContent>
+      </Card>
+
+      {reportData.weightedScores.length > 0 && (
+        <section>
+          <h2 className="text-xl font-semibold mb-3 text-primary border-b pb-2">Weighted Area Scores</h2>
+          <p className="text-sm text-muted-foreground mb-4">Areas are ordered by average score (descending). Average score is calculated out of the highest possible score for a single question (e.g., 4 or 5).</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {reportData.weightedScores.map((secScore) => (
+              <Card key={secScore.sectionId} className="shadow-md">
+                <CardHeader>
+                  <CardTitle className="text-lg flex justify-between items-center">
+                    <span>{secScore.sectionName}</span>
+                      <span className={`px-2 py-0.5 text-xs rounded-full font-mono ${getScoreColor(secScore.averageScore)} ${getScoreBgColor(secScore.averageScore).replace('bg-','bg-')}/20`}>
+                        Avg: {secScore.averageScore.toFixed(2)}
+                      </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="w-full bg-muted rounded-full h-2.5 mb-1">
+                      <div 
+                          className={`h-2.5 rounded-full ${getScoreBgColor(secScore.averageScore)}`} 
+                          style={{ width: `${(secScore.averageScore / getHighestPossibleOptionScore(questionnaire.sections.find(s=>s.id === secScore.sectionId)?.questions[0]?.options || [])) * 100}%` }}
+                      ></div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                      Achieved: {secScore.achievedScore} / {secScore.maxPossibleScore} (from {secScore.numQuestionsInSection} questions)
+                  </p>
+                  <p className={`text-sm font-medium ${secScore.color}`}>Weighted Average: {secScore.weightedAverageScore.toFixed(2)} (Weight: {secScore.sectionWeight})</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
+      
+      {reportData.matrixSections.length > 0 && (
+        <section>
+          <Separator className="my-6" />
+          <h2 className="text-xl font-semibold mb-3 text-primary border-b pb-2">Double-Entry Matrix Analysis</h2>
+           {reportData.matrixSections.map(section => (
+               <Card key={section.id} className="bg-muted/30 p-4">
+                 <CardHeader className="p-0 pb-2"><CardTitle className="text-lg">{section.name}</CardTitle></CardHeader>
+                 <CardContent className="p-0">
+                    <p className="text-muted-foreground text-sm">
+                        Details for this matrix, including the visual plot, will be implemented in a future update.
+                    </p>
+                 </CardContent>
+              </Card>
+           ))}
+        </section>
+      )}
+
+      {reportData.countAnalyses.length > 0 && (
+        <section>
+            <Separator className="my-6" />
+            <h2 className="text-xl font-semibold mb-3 text-primary border-b pb-2">Response Count Analysis</h2>
+            <div className="space-y-4">
+            {reportData.countAnalyses.map(analysis => (
+                <Card key={analysis.sectionId}>
+                    <CardHeader><CardTitle>{analysis.sectionName}</CardTitle></CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Answer</TableHead>
+                                    <TableHead className="text-right">Count</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {Object.entries(analysis.answerCounts).sort(([, a], [, b]) => b - a).map(([text, count]) => (
+                                    <TableRow key={text}>
+                                        <TableCell className="font-medium flex items-center">
+                                            {text}
+                                            {analysis.mostFrequentAnswers.includes(text) && (
+                                                <Badge variant="secondary" className="ml-2 bg-yellow-200 text-yellow-800">
+                                                    <Star className="h-3 w-3 mr-1"/> Most Frequent
+                                                </Badge>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-right">{count}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            ))}
+            </div>
+        </section>
+      )}
+
+      <Separator className="my-6" />
+      
+      <section>
+        <h2 className="text-xl font-semibold mb-3 text-primary border-b pb-2">Summary & Comments</h2>
+        <Card>
+            <CardContent className="pt-6 space-y-4">
+                <div>
+                    <h3 className="font-semibold text-md mb-1">General Observations</h3>
+                    <p className="text-sm text-muted-foreground italic">{staticExecutiveText}</p>
+                </div>
+                <div>
+                    <h3 className="font-semibold text-md mb-1">Admin Comments</h3>
+                      <div className="p-3 border rounded-md bg-secondary/20 min-h-[60px]">
+                        <p className="text-sm text-secondary-foreground">
+                            {response.adminComments?.executiveSummary || "No executive summary comments added yet."}
+                        </p>
+                      </div>
+                    <Button variant="outline" size="sm" className="mt-2 print-hide" disabled> 
+                        <Edit className="mr-2 h-3 w-3"/> Edit Comments
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+      </section>
+      
+      <CardFooter className="print-hide">
+          <p className="text-xs text-muted-foreground">Full report export to PDF/Word will be available in a future update. Use browser print for a basic version.</p>
+      </CardFooter>
     </div>
   );
 }

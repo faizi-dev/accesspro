@@ -103,7 +103,8 @@ export default function UploadQuestionnairePage() {
           name: sectionUpload.name,
           description: sectionUpload.description,
           instructions: sectionUpload.instructions,
-          weight: sectionUpload.weight, // Ensure weight is present
+          type: sectionUpload.type || 'weighted', // Default to weighted
+          weight: sectionUpload.weight,
           questions: sectionUpload.questions.map((questionUpload, qIdx) => {
             const questionSlug = generateSlug(questionUpload.question?.substring(0,30) || `question${qIdx}`);
             const questionId = questionUpload.tempId 
@@ -160,48 +161,67 @@ export default function UploadQuestionnairePage() {
   };
   
   const sampleJson = `{
-  "versionName": "Sample Wellness Survey V2",
+  "versionName": "Comprehensive Assessment V3",
   "sections": [
     {
       "name": "Diet and Wellness",
-      "description": "This section explores your eating habits and awareness of wellness.",
-      "instructions": "Please answer honestly to get the most accurate feedback.",
-      "weight": 0.4,
+      "description": "Eating habits and wellness awareness.",
+      "type": "weighted",
+      "weight": 0.5,
       "questions": [
         {
-          "question": "How many servings of fruits and vegetables do you consume on average per day?",
+          "question": "How many servings of fruits and vegetables do you consume per day?",
           "options": [
             { "text": "Less than 2 servings", "score": 1 },
             { "text": "2-3 servings", "score": 2 },
             { "text": "4-5 servings", "score": 3 },
             { "text": "More than 5 servings", "score": 4 }
           ]
-        },
-        {
-          "question": "How often do you engage in physical activity per week?",
-          "options": [
-            { "text": "Rarely or never", "score": 1 },
-            { "text": "1-2 times a week", "score": 2 },
-            { "text": "3-4 times a week", "score": 3 },
-            { "text": "5 or more times a week", "score": 4 }
-          ]
         }
       ]
     },
     {
       "name": "Mental Wellbeing",
-      "description": "Questions about your stress levels and coping mechanisms.",
-      "instructions": "Consider your typical week when answering these questions.",
-      "weight": 0.6,
+      "description": "Stress levels and coping mechanisms.",
+      "type": "weighted",
+      "weight": 0.5,
       "questions": [
         {
-          "question": "How would you rate your average stress level on a scale of 1 to 5 (5 being highest)?",
+          "question": "How would you rate your average stress level (5 is highest)?",
           "options": [
             { "text": "1 - Very Low", "score": 4 },
             { "text": "2 - Low", "score": 3 },
             { "text": "3 - Moderate", "score": 2 },
             { "text": "4 - High", "score": 1 },
             { "text": "5 - Very High", "score": 0 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Resource Alignment",
+      "description": "Matrix for plotting resources.",
+      "type": "matrix",
+      "weight": 0,
+      "questions": [
+        {
+          "question": "This is a placeholder for a matrix-type question.",
+          "options": [ { "text": "Option A", "score": 0 } ]
+        }
+      ]
+    },
+    {
+      "name": "Preferred Communication Channel",
+      "description": "Tally of preferred contact methods.",
+      "type": "count",
+      "weight": 0,
+      "questions": [
+        {
+          "question": "What is your preferred method for receiving updates?",
+          "options": [
+            { "text": "Email", "score": 0 },
+            { "text": "SMS/Text Message", "score": 0 },
+            { "text": "Phone Call", "score": 0 }
           ]
         }
       ]
@@ -218,13 +238,13 @@ export default function UploadQuestionnairePage() {
             <CardTitle className="text-2xl font-headline">Upload New Questionnaire Version</CardTitle>
         </div>
         <CardDescription>
-          Provide a version name (e.g., "Annual Customer Feedback 2024"). Then, upload or paste a JSON file with the new structure: sections should have 'name', 'description' (optional), 'instructions' (optional), 'weight', and 'questions'. Questions should have 'question' and 'options'. Options should have 'text' and 'score'. 'tempId' fields are optional for pre-defining parts of IDs.
+          Provide a version name. Then, upload or paste a JSON file. Sections should have 'name', 'weight', and 'questions'. Optionally include 'description', 'instructions', and 'type' ('weighted', 'matrix', or 'count').
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <Label htmlFor="versionName" className="text-base">Version Name (for this questionnaire)</Label>
+            <Label htmlFor="versionName" className="text-base">Version Name</Label>
             <Input
               id="versionName"
               type="text"

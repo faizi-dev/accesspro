@@ -21,7 +21,7 @@ import Link from 'next/link';
 import { 
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Label as RechartsLabel,
 } from 'recharts';
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table as DocxTable, TableRow as DocxTableRow, TableCell as DocxTableCell, WidthType, ImageRun, AlignmentType } from 'docx';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table as DocxTable, TableRow as DocxTableRow, TableCell as DocxTableCell, WidthType, ImageRun, AlignmentType, ShadingType } from 'docx';
 import { saveAs } from 'file-saver';
 import html2canvas from 'html2canvas';
 
@@ -384,19 +384,32 @@ export default function ReportDetailsPage() {
                     new DocxTableRow({
                         children: [
                             new DocxTableCell({ children: [new Paragraph({ text: "Score Value", bold: true })] }),
-                            new DocxTableCell({ children: [new Paragraph({ text: "Times Selected", bold: true })] }),
+                            new DocxTableCell({ children: [new Paragraph({ text: "Times Selected", bold: true, alignment: AlignmentType.RIGHT })] }),
                         ],
                     }),
                 ];
                 Object.entries(analysis.scoreCounts).sort(([, a], [, b]) => b - a).forEach(([score, count]) => {
-                     let scoreTextChildren = [new TextRun(`Score: ${score}`)];
-                     if(analysis.mostFrequentScores.includes(Number(score))) {
+                     const isMostFrequent = analysis.mostFrequentScores.includes(Number(score));
+                     const scoreTextChildren = [new TextRun(`Score: ${score}`)];
+                     if(isMostFrequent) {
                         scoreTextChildren.push(new TextRun({ text: " (Most Frequent)", bold: true }));
                      }
+
+                     const cellShading = isMostFrequent ? {
+                        fill: "FFFFE0", // Light Yellow to mimic the badge background
+                        val: ShadingType.CLEAR,
+                     } : undefined;
+
                      tableRows.push(new DocxTableRow({
                         children: [
-                            new DocxTableCell({ children: [new Paragraph({ children: scoreTextChildren })] }),
-                            new DocxTableCell({ children: [new Paragraph(String(count))] }),
+                            new DocxTableCell({ 
+                                children: [new Paragraph({ children: scoreTextChildren })],
+                                shading: cellShading,
+                            }),
+                            new DocxTableCell({ 
+                                children: [new Paragraph({ text: String(count), alignment: AlignmentType.RIGHT })],
+                                shading: cellShading,
+                            }),
                         ],
                      }));
                 });

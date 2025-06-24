@@ -122,8 +122,8 @@ export default function ReportDetailsPage() {
         if (!sectionType) {
           if (section.weight > 0) {
             sectionType = 'weighted';
-          } else if (section.questions.length === 2) {
-            // Heuristic: If weight is 0 and there are 2 questions, it's likely a matrix.
+          } else if (section.questions.length === 2 && section.questions.every(q => q.options.length >= 2)) {
+            // Heuristic: If weight is 0, 2 questions, it's likely a matrix.
             sectionType = 'matrix';
           } else {
             // Fallback for non-weighted, non-matrix sections.
@@ -288,6 +288,7 @@ export default function ReportDetailsPage() {
       
       <Separator className="my-6" />
 
+      {/* --- TOTAL AVERAGE RANKING --- */}
       {reportData.weightedScores.length > 0 && (
           <Card>
             <CardHeader>
@@ -300,7 +301,7 @@ export default function ReportDetailsPage() {
           </Card>
       )}
 
-      {/* Section for Weighted Scores (Bars) */}
+      {/* --- ZONE 1-7: WEIGHTED AREA SCORES --- */}
       {reportData.weightedScores.length > 0 && (
         <Card>
           <CardHeader>
@@ -331,7 +332,7 @@ export default function ReportDetailsPage() {
         </Card>
       )}
       
-      {/* Section for Matrix Analysis (Scatter Plots) */}
+      {/* --- ZONE 8-9: MATRIX ANALYSIS --- */}
       {reportData.matrixAnalyses.length > 0 && (
         <section className="page-break-before">
           <Separator className="my-6" />
@@ -373,7 +374,7 @@ export default function ReportDetailsPage() {
         </section>
       )}
 
-      {/* Section for Count Analysis (Tables) */}
+      {/* --- ZONE 10: COUNT ANALYSIS --- */}
       {reportData.countAnalyses.length > 0 && (
         <section className="page-break-before">
             <Separator className="my-6" />
@@ -415,6 +416,7 @@ export default function ReportDetailsPage() {
 
       <Separator className="my-6" />
       
+      {/* --- FOOTER & COMMENTS --- */}
       <section>
         <h2 className="text-xl font-semibold mb-3 text-primary border-b pb-2">Summary & Comments</h2>
         <Card>
@@ -444,5 +446,3 @@ export default function ReportDetailsPage() {
     </div>
   );
 }
-
-    

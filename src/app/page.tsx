@@ -16,7 +16,8 @@ export default function HomePage() {
         </p>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl w-full">
+      {/* className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl w-full" */}
+      <div>
         <Card className="shadow-xl hover:shadow-2xl transition-shadow duration-300">
           <CardHeader>
             <div className="flex items-center gap-3 mb-2">
@@ -39,7 +40,7 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-xl hover:shadow-2xl transition-shadow duration-300">
+        {/* <Card className="shadow-xl hover:shadow-2xl transition-shadow duration-300">
           <CardHeader>
              <div className="flex items-center gap-3 mb-2">
               <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M15.5 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z"/><path d="M15 3v6h6"/><path d="m10 16-2.5-2.5L10 11"/><path d="m14 16 2.5-2.5L14 11"/></svg>
@@ -59,7 +60,7 @@ export default function HomePage() {
               Illustrative link. Actual assessments require a unique, valid link.
             </p>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
       <footer className="mt-16 text-center text-muted-foreground">

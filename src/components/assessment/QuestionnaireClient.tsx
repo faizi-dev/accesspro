@@ -69,6 +69,10 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
       setShuffledOptionsCache(newCache);
     }
   }, [currentSection, shuffledOptionsCache]);
+  
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentSectionIndex]);
 
 
   const handleAnswerChange = (questionId: string, optionId: string) => {

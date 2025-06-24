@@ -16,7 +16,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Label as RechartsLabel } from 'recharts';
+import { 
+  ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Label as RechartsLabel,
+  BarChart, Bar, Legend, Cell
+} from 'recharts';
 
 
 // Helper function to determine color based on score for recharts fill AND text
@@ -42,6 +45,21 @@ const getHighestPossibleOptionScore = (questions: SectionType['questions']): num
     // In a weighted section, assume all questions have same max score
     return Math.max(...questions[0].options.map(opt => opt.score), 0);
 }
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="p-2 bg-card border rounded-md shadow-lg text-card-foreground text-sm">
+        <p className="font-bold">{label}</p>
+        <p><strong>Average Score:</strong> <span style={{ color: getScoreFillColor(data.averageScore) }}>{data.averageScore.toFixed(2)}</span></p>
+        <p><strong>Weighted Score:</strong> {data.weightedAverageScore.toFixed(2)}</p>
+        <p className="text-xs text-muted-foreground">(Weight: {data.sectionWeight})</p>
+      </div>
+    );
+  }
+  return null;
+};
 
 
 export default function ReportDetailsPage() {
@@ -229,8 +247,8 @@ export default function ReportDetailsPage() {
         </Button>
         <Skeleton className="h-12 w-3/4" />
         <Skeleton className="h-8 w-1/2" />
-        <Card><CardHeader><Skeleton className="h-8 w-1/4 mb-2" /><Skeleton className="h-4 w-full" /></CardHeader><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
-        <Card><CardHeader><Skeleton className="h-8 w-1/4 mb-2" /><Skeleton className="h-4 w-full" /></CardHeader><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
+        <Card><CardHeader><Skeleton className="h-8 w-1/4 mb-2" /><Skeleton className="h-4 w-full" /></CardHeader><CardContent><Skeleton className="h-48 w-full" /></CardContent></Card>
+        <Card><CardHeader><Skeleton className="h-8 w-1/4 mb-2" /><Skeleton className="h-4 w-full" /></CardHeader><CardContent><Skeleton className="h-48 w-full" /></CardContent></Card>
       </div>
     );
   }
@@ -251,6 +269,8 @@ export default function ReportDetailsPage() {
   }
   
   const staticExecutiveText = "This executive summary provides a high-level overview of the assessment results. Scores are color-coded for quick identification of strengths and areas for attention. Weighted averages reflect the relative importance of each area as defined in the questionnaire structure.";
+
+  const sortedWeightedScores = [...reportData.weightedScores].sort((a,b) => b.averageScore - a.averageScore);
 
   return (
     <div className="space-y-8 p-4 md:p-6 print:p-2">
@@ -286,8 +306,6 @@ export default function ReportDetailsPage() {
         </CardHeader>
       </Card>
       
-      <Separator className="my-6" />
-
       {/* --- TOTAL AVERAGE RANKING --- */}
       {reportData.weightedScores.length > 0 && (
           <Card>
@@ -303,33 +321,35 @@ export default function ReportDetailsPage() {
 
       {/* --- ZONE 1-7: WEIGHTED AREA SCORES --- */}
       {reportData.weightedScores.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Weighted Area Scores</CardTitle>
-            <CardDescription>Areas are ordered by average score (descending). The score is calculated out of the highest possible score for a single question (e.g., {highestPossibleScore}).</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4">
-             {reportData.weightedScores.sort((a, b) => b.averageScore - a.averageScore).map(score => (
-              <div key={score.sectionId} className="flex items-center justify-between gap-4">
-                 <p className="font-medium truncate flex-1">{score.sectionName}</p>
-                 <div className="flex items-center gap-4 w-48">
-                    <div className="w-full bg-muted rounded-full h-2.5">
-                       <div 
-                        className="h-2.5 rounded-full" 
-                        style={{
-                          width: `${(score.averageScore / highestPossibleScore) * 100}%`, 
-                          backgroundColor: getScoreFillColor(score.averageScore)
-                        }}>
-                       </div>
-                    </div>
-                    <span className={`font-bold text-lg w-12 text-right ${getScoreTextColorClassName(score.averageScore)}`}>
-                        {score.averageScore.toFixed(2)}
-                    </span>
-                 </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        <section>
+          <Separator className="my-6" />
+          <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Weighted Area Scores</h2>
+          <Card>
+            <CardHeader>
+              <CardTitle>Performance by Area</CardTitle>
+              <CardDescription>Bar chart showing the average score for each weighted area, ordered high to low.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <ResponsiveContainer width="100%" height={Math.max(250, sortedWeightedScores.length * 40)}>
+                    <BarChart
+                        data={sortedWeightedScores}
+                        layout="vertical"
+                        margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
+                    >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                        <XAxis type="number" domain={[0, highestPossibleScore]} />
+                        <YAxis type="category" dataKey="sectionName" width={150} interval={0} tick={{width: 140, textAnchor: 'end'}}/>
+                        <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))' }}/>
+                        <Bar dataKey="averageScore" radius={[0, 4, 4, 0]}>
+                            {sortedWeightedScores.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={getScoreFillColor(entry.averageScore)} />
+                            ))}
+                        </Bar>
+                    </BarChart>
+                </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </section>
       )}
       
       {/* --- ZONE 8-9: MATRIX ANALYSIS --- */}
@@ -388,6 +408,7 @@ export default function ReportDetailsPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Answer</TableHead>
+
                                     <TableHead className="text-right">Count</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -446,3 +467,5 @@ export default function ReportDetailsPage() {
     </div>
   );
 }
+
+    

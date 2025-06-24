@@ -16,10 +16,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Bar, BarChart, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Label as RechartsLabel, Cell, LabelList } from 'recharts';
+import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Label as RechartsLabel } from 'recharts';
 
 
-// Helper function to determine color based on score for recharts fill
+// Helper function to determine color based on score for recharts fill AND text
 const getScoreFillColor = (score: number): string => {
   if (score <= 1.5) return 'hsl(var(--chart-5))'; // Red
   if (score > 1.5 && score <= 2.5) return 'hsl(var(--chart-2))'; // Orange
@@ -37,9 +37,10 @@ const getScoreTextColorClassName = (score: number): string => {
   return 'text-muted-foreground';
 };
 
-const getHighestPossibleOptionScore = (options: AnswerOption[]): number => {
-    if (!options || options.length === 0) return 4;
-    return Math.max(...options.map(opt => opt.score), 0);
+const getHighestPossibleOptionScore = (questions: SectionType['questions']): number => {
+    if (!questions || questions.length === 0 || !questions[0].options || questions[0].options.length === 0) return 4;
+    // In a weighted section, assume all questions have same max score
+    return Math.max(...questions[0].options.map(opt => opt.score), 0);
 }
 
 
@@ -111,12 +112,9 @@ export default function ReportDetailsPage() {
     for (const section of questionnaire.sections) {
         const type = section.type || 'weighted';
 
-        // Find the highest possible score for normalization in this section
-        if(section.questions.length > 0 && section.questions[0].options.length > 0) {
-            const sectionMaxScore = getHighestPossibleOptionScore(section.questions[0].options);
-            if (sectionMaxScore > overallHighestScore) {
-                overallHighestScore = sectionMaxScore;
-            }
+        const sectionMaxScore = getHighestPossibleOptionScore(section.questions);
+        if (sectionMaxScore > overallHighestScore) {
+            overallHighestScore = sectionMaxScore;
         }
 
         switch (type) {
@@ -136,7 +134,7 @@ export default function ReportDetailsPage() {
                 const averageScore = section.questions.length > 0 
                     ? parseFloat((achievedScore / section.questions.length).toFixed(2)) 
                     : 0;
-
+                
                 weightedScores.push({
                     sectionId: section.id,
                     sectionName: section.name,
@@ -144,7 +142,6 @@ export default function ReportDetailsPage() {
                     achievedScore,
                     maxPossibleScore: maxPossibleScoreInSection,
                     averageScore,
-                    color: getScoreFillColor(averageScore),
                     weightedAverageScore: parseFloat((averageScore * section.weight).toFixed(2)),
                     numQuestionsInSection: section.questions.length,
                 });
@@ -211,8 +208,6 @@ export default function ReportDetailsPage() {
         return sum + score.weightedAverageScore;
     }, 0);
     
-    weightedScores.sort((a, b) => a.averageScore - b.averageScore); // Sort ascending for horizontal bar chart
-
     return { reportData: { weightedScores, matrixAnalyses, countAnalyses, totalAverageRanking }, highestPossibleScore: overallHighestScore };
 
   }, [response, questionnaire]);
@@ -299,34 +294,28 @@ export default function ReportDetailsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Weighted Area Scores</CardTitle>
-            <CardDescription>Areas are ordered by average score (ascending). The score is calculated out of the highest possible score for a single question (e.g., {highestPossibleScore}).</CardDescription>
+            <CardDescription>Areas are ordered by average score (descending). The score is calculated out of the highest possible score for a single question (e.g., {highestPossibleScore}).</CardDescription>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={reportData.weightedScores.length * 50}>
-              <BarChart
-                layout="vertical"
-                data={reportData.weightedScores}
-                margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                <XAxis type="number" domain={[0, highestPossibleScore]} />
-                <YAxis dataKey="sectionName" type="category" scale="band" width={150} style={{ fontSize: '12px' }}/>
-                <RechartsTooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: 'var(--radius)' 
-                  }}
-                  formatter={(value, name, props) => [`${value} (Weighted: ${props.payload.weightedAverageScore})`, props.payload.sectionName]}
-                />
-                <Bar dataKey="averageScore" barSize={20}>
-                   <LabelList dataKey="averageScore" position="right" offset={8} style={{ fill: 'hsl(var(--foreground))', fontSize: '12px' }} />
-                  {reportData.weightedScores.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <CardContent className="grid gap-4">
+             {reportData.weightedScores.sort((a, b) => b.averageScore - a.averageScore).map(score => (
+              <div key={score.sectionId} className="flex items-center justify-between gap-4">
+                 <p className="font-medium truncate flex-1">{score.sectionName}</p>
+                 <div className="flex items-center gap-4 w-48">
+                    <div className="w-full bg-muted rounded-full h-2.5">
+                       <div 
+                        className="h-2.5 rounded-full" 
+                        style={{
+                          width: `${(score.averageScore / highestPossibleScore) * 100}%`, 
+                          backgroundColor: getScoreFillColor(score.averageScore)
+                        }}>
+                       </div>
+                    </div>
+                    <span className={`font-bold text-lg w-12 text-right ${getScoreTextColorClassName(score.averageScore)}`}>
+                        {score.averageScore.toFixed(2)}
+                    </span>
+                 </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}
@@ -442,5 +431,3 @@ export default function ReportDetailsPage() {
     </div>
   );
 }
-
-    

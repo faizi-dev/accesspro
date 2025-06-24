@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { db } from '@/lib/firebase/config';
@@ -9,7 +9,7 @@ import { doc, getDoc, Timestamp, updateDoc } from 'firebase/firestore';
 import type { CustomerResponse, QuestionnaireVersion, Section as SectionType, AnswerOption, CalculatedSectionScore, CalculatedCountAnalysis, CalculatedMatrixAnalysis } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, FileText, AlertCircle, Edit, Star } from 'lucide-react';
+import { ArrowLeft, FileText, AlertCircle, Edit, Star, Download, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,6 +20,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { 
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Label as RechartsLabel,
 } from 'recharts';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table as DocxTable, TableRow as DocxTableRow, TableCell as DocxTableCell, WidthType, ImageRun, AlignmentType } from 'docx';
+import { saveAs } from 'file-saver';
+import html2canvas from 'html2canvas';
 
 
 // Helper function to determine color based on score for recharts fill AND text
@@ -75,6 +78,9 @@ export default function ReportDetailsPage() {
   const [isEditingComments, setIsEditingComments] = useState(false);
   const [executiveSummaryComment, setExecutiveSummaryComment] = useState("");
   const [isSavingComment, setIsSavingComment] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const matrixChartRef = useRef<HTMLDivElement>(null);
 
 
   useEffect(() => {
@@ -132,10 +138,14 @@ export default function ReportDetailsPage() {
     const countAnalyses: CalculatedCountAnalysis[] = [];
     let overallHighestScore = 4;
 
-    questionnaire.sections.forEach((section) => {
-        const sectionType = section.type || 'bar'; // Default to bar for backward compatibility
+    questionnaire.sections.forEach((section, index) => {
+        const sectionType = section.type;
+        
+        // This logic determines type by index for backward compatibility if `type` field is missing.
+        const effectiveType = sectionType || (index < 7 ? 'bar' : index < 9 ? 'matrix' : 'count');
 
-        if (sectionType === 'bar') {
+
+        if (effectiveType === 'bar') {
             const sectionMaxScore = getHighestPossibleOptionScore(section.questions);
             if (sectionMaxScore > overallHighestScore) {
                 overallHighestScore = sectionMaxScore;
@@ -153,7 +163,7 @@ export default function ReportDetailsPage() {
                 }
             });
             const averageScore = numAnswered > 0 ? parseFloat((achievedScore / numAnswered).toFixed(2)) : 0;
-            const sectionWeight = typeof section.total_score === 'number' ? section.total_score : (section.weight || 0);
+            const sectionWeight = typeof section.total_score === 'number' ? section.total_score : (typeof section.weight === 'number' ? section.weight : 0);
 
             barScores.push({
                 sectionId: section.id,
@@ -165,7 +175,7 @@ export default function ReportDetailsPage() {
             });
         }
         
-        else if (sectionType === 'matrix') {
+        else if (effectiveType === 'matrix') {
              const question = section.questions[0];
             if (question) {
                 const selectedOptionId = response.responses[question.id];
@@ -176,7 +186,7 @@ export default function ReportDetailsPage() {
             }
         }
         
-        else if (sectionType === 'count') {
+        else if (effectiveType === 'count') {
             const scoreCounts: Record<string, number> = {};
             section.questions.forEach(q => {
                 const selectedOptionId = response.responses[q.id];
@@ -205,8 +215,8 @@ export default function ReportDetailsPage() {
     
     // Process collected matrix sections into a single analysis
     const matrixAnalyses: CalculatedMatrixAnalysis[] = [];
-    const xSection = matrixSections.find(s => s.matrix_axis === 'x');
-    const ySection = matrixSections.find(s => s.matrix_axis === 'y');
+    const xSection = matrixSections.find(s => s.matrix_axis === 'x') || matrixSections[0];
+    const ySection = matrixSections.find(s => s.matrix_axis === 'y') || matrixSections[1];
 
     if (xSection && ySection) {
         const xAxisLabel = xSection.name || "X-Axis";
@@ -264,6 +274,134 @@ export default function ReportDetailsPage() {
     }
   };
 
+  const handleExportToDocx = async () => {
+    if (!response || !questionnaire) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Report data not available for export.' });
+        return;
+    }
+    setIsDownloading(true);
+
+    try {
+        let chartImageBuffer: Buffer | undefined;
+        if (matrixChartRef.current) {
+            const canvas = await html2canvas(matrixChartRef.current, { backgroundColor: null });
+            const imageDataUrl = canvas.toDataURL('image/png');
+            chartImageBuffer = Buffer.from(imageDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
+        }
+        
+        const createHeading = (text: string) => new Paragraph({
+            text,
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 240, after: 120 },
+        });
+
+        const docSections: (Paragraph | DocxTable)[] = [];
+
+        docSections.push(new Paragraph({
+            text: "Executive Summary",
+            heading: HeadingLevel.HEADING_1,
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 240 },
+        }));
+
+        docSections.push(new Paragraph({ text: `Report for: ${response.customerName || 'N/A'}` }));
+        docSections.push(new Paragraph({ text: `Questionnaire: ${response.questionnaireVersionName}` }));
+        docSections.push(new Paragraph({ text: `Submitted: ${format(response.submittedAt, 'PPP p')}`, spacing: { after: 240 } }));
+
+        if (reportData.barScores.length > 0) {
+             docSections.push(createHeading('Total Average Ranking'));
+             docSections.push(new Paragraph({
+                children: [new TextRun({ text: reportData.totalAverageRanking.toFixed(2), size: 48, bold: true })],
+                alignment: AlignmentType.CENTER
+             }));
+        }
+        
+        if (reportData.barScores.length > 0) {
+            docSections.push(createHeading('Weighted Area Scores'));
+            reportData.barScores.forEach(area => {
+                docSections.push(new Paragraph({
+                    children: [
+                        new TextRun({ text: `${area.sectionName}: `, bold: true }),
+                        new TextRun(area.averageScore.toFixed(2))
+                    ]
+                }));
+            });
+        }
+
+        if (reportData.matrixAnalyses.length > 0 && chartImageBuffer) {
+            docSections.push(createHeading('Double-Entry Matrix Analysis'));
+            docSections.push(new Paragraph({
+                children: [
+                    new ImageRun({
+                        data: chartImageBuffer,
+                        transformation: {
+                            width: 500,
+                            height: 300,
+                        },
+                    }),
+                ],
+                alignment: AlignmentType.CENTER
+            }));
+        }
+
+        if (reportData.countAnalyses.length > 0) {
+            docSections.push(createHeading('Response Count Analysis'));
+            reportData.countAnalyses.forEach(analysis => {
+                docSections.push(new Paragraph({ text: analysis.sectionName, bold: true, spacing: { after: 120 } }));
+                const tableRows = [
+                    new DocxTableRow({
+                        children: [
+                            new DocxTableCell({ children: [new Paragraph({ text: "Score Value", bold: true })] }),
+                            new DocxTableCell({ children: [new Paragraph({ text: "Times Selected", bold: true })] }),
+                        ],
+                    }),
+                ];
+                Object.entries(analysis.scoreCounts).sort(([, a], [, b]) => b - a).forEach(([score, count]) => {
+                     let scoreTextChildren = [new TextRun(`Score: ${score}`)];
+                     if(analysis.mostFrequentScores.includes(Number(score))) {
+                        scoreTextChildren.push(new TextRun({ text: " (Most Frequent)", bold: true }));
+                     }
+                     tableRows.push(new DocxTableRow({
+                        children: [
+                            new DocxTableCell({ children: [new Paragraph({ children: scoreTextChildren })] }),
+                            new DocxTableCell({ children: [new Paragraph(String(count))] }),
+                        ],
+                     }));
+                });
+                const table = new DocxTable({
+                    rows: tableRows,
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                });
+                docSections.push(table);
+            });
+        }
+
+        docSections.push(createHeading('Summary & Comments'));
+        docSections.push(new Paragraph({ 
+            text: "Admin Comments",
+            bold: true,
+            spacing: { after: 60 }
+        }));
+        docSections.push(new Paragraph({ text: response.adminComments?.executiveSummary || "No executive summary comments added yet." }));
+
+        const doc = new Document({
+            sections: [{
+                children: docSections
+            }],
+        });
+
+        Packer.toBlob(doc).then(blob => {
+            saveAs(blob, `Report-${response.customerName?.replace(/\s/g, '_') || response.id}.docx`);
+        });
+
+    } catch (error) {
+        console.error("Error exporting to DOCX:", error);
+        toast({ variant: "destructive", title: "Export Failed", description: "Could not generate the Word document." });
+    } finally {
+        setIsDownloading(false);
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -316,9 +454,19 @@ export default function ReportDetailsPage() {
         <Button variant="outline" onClick={() => router.push('/admin/reports')}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Reports List
         </Button>
-        <Button onClick={() => window.print()}>
-          <FileText className="mr-2 h-4 w-4" /> Print/Export Page (Basic)
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={handleExportToDocx} disabled={isDownloading}>
+            {isDownloading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 h-4 w-4" />
+            )}
+            Download as Word
+          </Button>
+          <Button onClick={() => window.print()}>
+            <FileText className="mr-2 h-4 w-4" /> Print/Export (Basic)
+          </Button>
+        </div>
       </div>
 
       <Card className="print-shadow-none print-border-none">
@@ -384,7 +532,7 @@ export default function ReportDetailsPage() {
       
       {/* --- MATRIX ANALYSIS --- */}
       {reportData.matrixAnalyses.length > 0 && (
-        <section className="page-break-before">
+        <section ref={matrixChartRef} className="page-break-before">
           <Separator className="my-6" />
           <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Double-Entry Matrix Analysis</h2>
            <div className="grid grid-cols-1 gap-6">
@@ -522,7 +670,7 @@ export default function ReportDetailsPage() {
       </section>
       
       <CardFooter className="print-hide">
-          <p className="text-xs text-muted-foreground">Full report export to PDF/Word will be available in a future update. Use browser print for a basic version.</p>
+          <p className="text-xs text-muted-foreground">For a fully editable version, download the report as a Word document.</p>
       </CardFooter>
     </div>
   );

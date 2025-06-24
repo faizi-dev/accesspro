@@ -74,11 +74,8 @@ export interface CalculatedSectionScore {
   sectionName: string;
   sectionWeight: number;
   achievedScore: number;
-  maxPossibleScore: number; // Max score for all questions in this section
-  averageScore: number; // Normalized to the typical score range (e.g., 1-4 or 1-5)
-  color: string; // HSL color string for recharts fill
+  averageScore: number;
   weightedAverageScore: number;
-  numQuestionsInSection: number;
 }
 
 // New type for count analysis

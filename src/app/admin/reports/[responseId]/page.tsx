@@ -18,7 +18,6 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { 
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Label as RechartsLabel,
-  BarChart, Bar, Legend, Cell
 } from 'recharts';
 
 
@@ -51,10 +50,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     const data = payload[0].payload;
     return (
       <div className="p-2 bg-card border rounded-md shadow-lg text-card-foreground text-sm">
-        <p className="font-bold">{label}</p>
-        <p><strong>Average Score:</strong> <span style={{ color: getScoreFillColor(data.averageScore) }}>{data.averageScore.toFixed(2)}</span></p>
-        <p><strong>Weighted Score:</strong> {data.weightedAverageScore.toFixed(2)}</p>
-        <p className="text-xs text-muted-foreground">(Weight: {data.sectionWeight})</p>
+        <p className="font-bold">{data.name}</p>
+        <p><strong>Effort:</strong> {data.x}</p>
+        <p><strong>Impact:</strong> {data.y}</p>
       </div>
     );
   }
@@ -151,19 +149,19 @@ export default function ReportDetailsPage() {
 
         if (sectionType === 'weighted') {
             let achievedScore = 0;
-            let maxPossibleScoreInSection = 0;
+            let numAnswered = 0;
             
             section.questions.forEach(q => {
                 const selectedOptionId = response.responses[q.id];
                 const selectedOption = q.options.find(opt => opt.id === selectedOptionId);
                 if (selectedOption) {
                     achievedScore += selectedOption.score;
+                    numAnswered++;
                 }
-                maxPossibleScoreInSection += Math.max(...q.options.map(opt => opt.score), 0);
             });
 
-            const averageScore = section.questions.length > 0 
-                ? parseFloat((achievedScore / section.questions.length).toFixed(2)) 
+            const averageScore = numAnswered > 0 
+                ? parseFloat((achievedScore / numAnswered).toFixed(2)) 
                 : 0;
             
             weightedScores.push({
@@ -171,10 +169,8 @@ export default function ReportDetailsPage() {
                 sectionName: section.name,
                 sectionWeight: section.weight,
                 achievedScore,
-                maxPossibleScore: maxPossibleScoreInSection,
                 averageScore,
                 weightedAverageScore: parseFloat((averageScore * section.weight).toFixed(2)),
-                numQuestionsInSection: section.questions.length,
             });
         } else if (sectionType === 'matrix') {
             if (section.questions.length < 2) {
@@ -327,26 +323,30 @@ export default function ReportDetailsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Performance by Area</CardTitle>
-              <CardDescription>Bar chart showing the average score for each weighted area, ordered high to low.</CardDescription>
+              <CardDescription>Average score for each weighted area, ordered high to low.</CardDescription>
             </CardHeader>
-            <CardContent>
-                <ResponsiveContainer width="100%" height={Math.max(250, sortedWeightedScores.length * 40)}>
-                    <BarChart
-                        data={sortedWeightedScores}
-                        layout="vertical"
-                        margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
-                    >
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                        <XAxis type="number" domain={[0, highestPossibleScore]} />
-                        <YAxis type="category" dataKey="sectionName" width={150} interval={0} tick={{width: 140, textAnchor: 'end'}}/>
-                        <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))' }}/>
-                        <Bar dataKey="averageScore" radius={[0, 4, 4, 0]}>
-                            {sortedWeightedScores.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={getScoreFillColor(entry.averageScore)} />
-                            ))}
-                        </Bar>
-                    </BarChart>
-                </ResponsiveContainer>
+            <CardContent className="space-y-4 pt-2">
+              {sortedWeightedScores.map((area) => (
+                <div key={area.sectionId} className="grid grid-cols-12 items-center gap-4 border-b pb-4 last:border-b-0 last:pb-0">
+                  <p className="col-span-12 sm:col-span-4 font-medium text-sm truncate" title={area.sectionName}>
+                    {area.sectionName}
+                  </p>
+                  <div className="col-span-10 sm:col-span-6">
+                    <div className="w-full bg-muted rounded-full h-3">
+                      <div
+                        className="h-3 rounded-full"
+                        style={{
+                          width: `${(area.averageScore / highestPossibleScore) * 100}%`,
+                          backgroundColor: getScoreFillColor(area.averageScore),
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                  <p className={`col-span-2 sm:col-span-2 text-right font-bold ${getScoreTextColorClassName(area.averageScore)}`}>
+                    {area.averageScore.toFixed(2)}
+                  </p>
+                </div>
+              ))}
             </CardContent>
           </Card>
         </section>
@@ -378,6 +378,7 @@ export default function ReportDetailsPage() {
                             </YAxis>
                             <RechartsTooltip 
                               cursor={{ strokeDasharray: '3 3' }} 
+                              content={<CustomTooltip />}
                               contentStyle={{ 
                                 backgroundColor: 'hsl(var(--card))', 
                                 border: '1px solid hsl(var(--border))',

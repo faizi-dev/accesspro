@@ -112,6 +112,16 @@ export default function UploadQuestionnairePage() {
           total_score: sectionUpload.total_score ?? null, // Use nullish coalescing to allow 0
           matrix_axis: sectionUpload.matrix_axis || null,
           questions: sectionUpload.questions.map((questionUpload, qIdx) => {
+            const sectionNameForError = `in section ${sIdx + 1} ("${sectionUpload.name}")`;
+            const questionNameForError = `question ${qIdx + 1}`;
+
+            if (!questionUpload.question || typeof questionUpload.question !== 'string') {
+              throw new Error(`A question is missing its "question" text ${sectionNameForError}.`);
+            }
+             if (!questionUpload.options || !Array.isArray(questionUpload.options)) {
+              throw new Error(`A question is missing its "options" array ${sectionNameForError}, ${questionNameForError}.`);
+            }
+
             const questionSlug = generateSlug(questionUpload.question?.substring(0,30) || `question${qIdx}`);
             const questionId = questionUpload.tempId 
               ? `${questionUpload.tempId}_s${sIdx}_q${qIdx}_${uuidv4().substring(0,4)}` 
@@ -121,10 +131,18 @@ export default function UploadQuestionnairePage() {
               id: questionId,
               question: questionUpload.question,
               options: questionUpload.options.map((optionUpload, oIdx) => {
+                 if (!optionUpload.text || typeof optionUpload.text !== 'string') {
+                  throw new Error(`An option is missing its "text" ${sectionNameForError}, ${questionNameForError}.`);
+                }
+                if (typeof optionUpload.score !== 'number') {
+                  throw new Error(`An option is missing a numeric "score" ${sectionNameForError}, ${questionNameForError}.`);
+                }
+
                 const optionSlug = generateSlug(optionUpload.text?.substring(0,15) || `option${oIdx}`);
                 const optionId = optionUpload.tempId 
                   ? `${optionUpload.tempId}_s${sIdx}_q${qIdx}_o${oIdx}_${uuidv4().substring(0,4)}`
                   : `${optionSlug}-s${sIdx}-q${qIdx}-o${oIdx}-${uuidv4().substring(0,8)}`;
+                
                 return {
                   id: optionId,
                   text: optionUpload.text,

@@ -83,6 +83,7 @@ export default function ReportDetailsPage() {
 
   const matrixChartRef = useRef<HTMLDivElement>(null);
   const barChartExportRef = useRef<HTMLDivElement>(null);
+  const countAnalysisExportRef = useRef<HTMLDivElement>(null);
 
 
   useEffect(() => {
@@ -311,10 +312,17 @@ export default function ReportDetailsPage() {
         }
         
         let matrixChartImageBuffer: Buffer | undefined;
-        if (matrixChartRef.current) {
-            const canvas = await html2canvas(matrixChartRef.current, { backgroundColor: null });
+        if (matrixChartRef.current && reportData.matrixAnalyses.length > 0) {
+            const canvas = await html2canvas(matrixChartRef.current, { backgroundColor: '#FFFFFF', scale: 2 });
             const imageDataUrl = canvas.toDataURL('image/png');
             matrixChartImageBuffer = Buffer.from(imageDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
+        }
+        
+        let countAnalysisImageBuffer: Buffer | undefined;
+        if (countAnalysisExportRef.current && reportData.countAnalyses.length > 0) {
+            const canvas = await html2canvas(countAnalysisExportRef.current, { backgroundColor: '#FFFFFF', scale: 2 });
+            const imageDataUrl = canvas.toDataURL('image/png');
+            countAnalysisImageBuffer = Buffer.from(imageDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
         }
         
         const createHeading = (text: string) => new Paragraph({
@@ -368,7 +376,7 @@ export default function ReportDetailsPage() {
                         data: matrixChartImageBuffer,
                         transformation: {
                             width: 500,
-                            height: 300,
+                            height: (matrixChartRef.current?.clientHeight || 300) * (500 / (matrixChartRef.current?.clientWidth || 600)),
                         },
                     }),
                 ],
@@ -376,49 +384,20 @@ export default function ReportDetailsPage() {
             }));
         }
 
-        if (reportData.countAnalyses.length > 0) {
+        if (reportData.countAnalyses.length > 0 && countAnalysisImageBuffer) {
             docSections.push(createHeading('Response Count Analysis'));
-            reportData.countAnalyses.forEach(analysis => {
-                docSections.push(new Paragraph({ text: analysis.sectionName, bold: true, spacing: { after: 120 } }));
-                const tableRows = [
-                    new DocxTableRow({
-                        children: [
-                            new DocxTableCell({ children: [new Paragraph({ text: "Score Value", bold: true })] }),
-                            new DocxTableCell({ children: [new Paragraph({ text: "Times Selected", bold: true, alignment: AlignmentType.RIGHT })] }),
-                        ],
+            docSections.push(new Paragraph({
+                children: [
+                    new ImageRun({
+                        data: countAnalysisImageBuffer,
+                        transformation: {
+                            width: 550,
+                            height: (countAnalysisExportRef.current?.clientHeight || 300) * (550 / (countAnalysisExportRef.current?.clientWidth || 800)),
+                        },
                     }),
-                ];
-                Object.entries(analysis.scoreCounts).sort(([, a], [, b]) => b - a).forEach(([score, count]) => {
-                     const isMostFrequent = analysis.mostFrequentScores.includes(Number(score));
-                     const scoreTextChildren = [new TextRun(`Score: ${score}`)];
-                     if(isMostFrequent) {
-                        scoreTextChildren.push(new TextRun({ text: " (Most Frequent)", bold: true }));
-                     }
-
-                     const cellShading = isMostFrequent ? {
-                        fill: "FFFFE0", // Light Yellow to mimic the badge background
-                        val: ShadingType.CLEAR,
-                     } : undefined;
-
-                     tableRows.push(new DocxTableRow({
-                        children: [
-                            new DocxTableCell({ 
-                                children: [new Paragraph({ children: scoreTextChildren })],
-                                shading: cellShading,
-                            }),
-                            new DocxTableCell({ 
-                                children: [new Paragraph({ text: String(count), alignment: AlignmentType.RIGHT })],
-                                shading: cellShading,
-                            }),
-                        ],
-                     }));
-                });
-                const table = new DocxTable({
-                    rows: tableRows,
-                    width: { size: 100, type: WidthType.PERCENTAGE },
-                });
-                docSections.push(table);
-            });
+                ],
+                alignment: AlignmentType.CENTER
+            }));
         }
 
         docSections.push(createHeading('Summary & Comments'));
@@ -487,8 +466,8 @@ export default function ReportDetailsPage() {
         <div className="space-y-4 pt-2">
             {sortedBarScores.map((area) => (
             <div key={area.sectionId} className="grid grid-cols-12 items-center gap-2 border-b pb-4 last:border-b-0 last:pb-0">
-                <p className="col-span-4 font-medium text-sm" title={area.sectionName}>
-                {area.sectionName}
+                <p className="col-span-4 font-medium text-sm self-center" title={area.sectionName}>
+                    {area.sectionName}
                 </p>
                 <div className="col-span-7">
                 <div className="w-full bg-slate-200 rounded-full h-3">
@@ -507,6 +486,36 @@ export default function ReportDetailsPage() {
             </div>
             ))}
         </div>
+      </div>
+       {/* Hidden container for DOCX export of count analysis */}
+      <div ref={countAnalysisExportRef} className="absolute -left-[9999px] top-auto w-[800px] p-4 bg-white text-black space-y-4">
+        <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Response Count Analysis</h2>
+        {reportData.countAnalyses.map(analysis => (
+          <div key={analysis.sectionId} className="p-4 border border-slate-200 rounded-lg">
+            <h3 className="text-lg font-semibold mb-2">{analysis.sectionName}</h3>
+            <table className="w-full text-sm">
+              <thead className="border-b border-slate-300">
+                <tr>
+                  <th className="p-2 text-left font-medium text-slate-600">Score Value</th>
+                  <th className="p-2 text-right font-medium text-slate-600">Times Selected</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(analysis.scoreCounts).sort(([, a], [, b]) => b - a).map(([score, count]) => (
+                  <tr key={score} className={analysis.mostFrequentScores.includes(Number(score)) ? 'bg-yellow-100' : ''}>
+                    <td className="p-2 font-medium">
+                      Score: {score}
+                      {analysis.mostFrequentScores.includes(Number(score)) && (
+                        <span className="ml-2 font-bold text-yellow-800">(Most Frequent)</span>
+                      )}
+                    </td>
+                    <td className="p-2 text-right">{count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
       </div>
       
       <style jsx global>{`

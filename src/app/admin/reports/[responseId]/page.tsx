@@ -455,8 +455,8 @@ export default function ReportDetailsPage() {
         <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Weighted Area Scores</h2>
         <div className="space-y-4 pt-2">
             {sortedBarScores.map((area) => (
-            <div key={area.sectionId} className="grid grid-cols-12 items-center gap-2 border-b pb-4 last:border-b-0 last:pb-0">
-                <p className="col-span-4 font-medium text-sm truncate" title={area.sectionName}>
+            <div key={area.sectionId} className="grid grid-cols-12 items-start gap-2 border-b pb-4 last:border-b-0 last:pb-0">
+                <p className="col-span-4 font-medium text-sm" title={area.sectionName}>
                 {area.sectionName}
                 </p>
                 <div className="col-span-7">

@@ -94,8 +94,8 @@ export default function UploadQuestionnairePage() {
           ? `${sectionUpload.tempId}_s_${sIdx}_${uuidv4().substring(0,4)}` 
           : `${sectionSlug}-s${sIdx}-${uuidv4().substring(0,8)}`;
         
-        if (typeof sectionUpload.weight !== 'number') {
-            throw new Error(`Section "${sectionUpload.name || `at index ${sIdx}`}" is missing a 'weight' or has an invalid one.`);
+        if (sectionUpload.type === 'weighted' && typeof sectionUpload.weight !== 'number') {
+            throw new Error(`Weighted section "${sectionUpload.name || `at index ${sIdx}`}" is missing a 'weight' or has an invalid one.`);
         }
 
         return {
@@ -104,7 +104,7 @@ export default function UploadQuestionnairePage() {
           description: sectionUpload.description,
           instructions: sectionUpload.instructions,
           type: sectionUpload.type || 'weighted', // Default to weighted
-          weight: sectionUpload.weight,
+          weight: sectionUpload.weight || 0,
           questions: sectionUpload.questions.map((questionUpload, qIdx) => {
             const questionSlug = generateSlug(questionUpload.question?.substring(0,30) || `question${qIdx}`);
             const questionId = questionUpload.tempId 
@@ -161,13 +161,14 @@ export default function UploadQuestionnairePage() {
   };
   
   const sampleJson = `{
-  "versionName": "Comprehensive Assessment V3",
+  "versionName": "Comprehensive Assessment V4",
   "sections": [
     {
       "name": "Diet and Wellness",
       "description": "Eating habits and wellness awareness.",
+      "instructions": "Select the option that best describes you.",
       "type": "weighted",
-      "weight": 0.5,
+      "weight": 0.4,
       "questions": [
         {
           "question": "How many servings of fruits and vegetables do you consume per day?",
@@ -184,7 +185,7 @@ export default function UploadQuestionnairePage() {
       "name": "Mental Wellbeing",
       "description": "Stress levels and coping mechanisms.",
       "type": "weighted",
-      "weight": 0.5,
+      "weight": 0.6,
       "questions": [
         {
           "question": "How would you rate your average stress level (5 is highest)?",
@@ -199,14 +200,23 @@ export default function UploadQuestionnairePage() {
       ]
     },
     {
-      "name": "Resource Alignment",
-      "description": "Matrix for plotting resources.",
+      "name": "Effort vs. Impact Matrix",
+      "description": "Plot tasks based on their required effort and expected impact.",
+      "instructions": "Answer the following two questions to plot the item on the matrix.",
       "type": "matrix",
       "weight": 0,
       "questions": [
         {
-          "question": "This is a placeholder for a matrix-type question.",
-          "options": [ { "text": "Option A", "score": 0 } ]
+          "question": "Rate the 'Effort' required (1=Low, 5=High)",
+          "options": [
+            { "text": "1", "score": 1 }, { "text": "2", "score": 2 }, { "text": "3", "score": 3 }, { "text": "4", "score": 4 }, { "text": "5", "score": 5 }
+          ]
+        },
+        {
+          "question": "Rate the 'Impact' expected (1=Low, 5=High)",
+          "options": [
+            { "text": "1", "score": 1 }, { "text": "2", "score": 2 }, { "text": "3", "score": 3 }, { "text": "4", "score": 4 }, { "text": "5", "score": 5 }
+          ]
         }
       ]
     },
@@ -302,3 +312,4 @@ export default function UploadQuestionnairePage() {
     </Card>
   );
 }
+

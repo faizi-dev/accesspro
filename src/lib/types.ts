@@ -31,7 +31,8 @@ export interface QuestionnaireVersion {
 
 export interface QuestionnaireUploadData {
   versionName?: string;
-  sections: Array<Omit<Section, 'id'> & {
+  sections: Array<Omit<Section, 'id' | 'weight'> & {
+    weight?: number;
     tempId?: string,
     questions: Array<Omit<Question, 'id'> & {
       tempId?: string,
@@ -88,6 +89,15 @@ export interface CalculatedCountAnalysis {
   answerCounts: Record<string, number>;
   // An array of option texts that are most frequent
   mostFrequentAnswers: string[];
+}
+
+// New type for Matrix analysis
+export interface CalculatedMatrixAnalysis {
+  sectionId: string;
+  sectionName: string;
+  xAxisLabel: string;
+  yAxisLabel: string;
+  data: { x: number; y: number; name: string }[];
 }
 
 

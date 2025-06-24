@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { db } from '@/lib/firebase/config';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
-import type { CustomerResponse, QuestionnaireVersion, Section as SectionType, AnswerOption, CalculatedSectionScore, CalculatedCountAnalysis } from '@/lib/types';
+import type { CustomerResponse, QuestionnaireVersion, Section as SectionType, AnswerOption, CalculatedSectionScore, CalculatedCountAnalysis, CalculatedMatrixAnalysis } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, FileText, AlertCircle, Edit, Star } from 'lucide-react';
@@ -16,6 +16,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Label as RechartsLabel } from 'recharts';
+
 
 // Helper function to determine color based on score
 const getScoreColor = (score: number): CalculatedSectionScore['color'] => {
@@ -97,11 +99,11 @@ export default function ReportDetailsPage() {
 
   const reportData = useMemo(() => {
     if (!response || !questionnaire) {
-        return { weightedScores: [], matrixSections: [], countAnalyses: [], totalAverageRanking: 0 };
+        return { weightedScores: [], matrixAnalyses: [], countAnalyses: [], totalAverageRanking: 0 };
     }
 
     const weightedScores: CalculatedSectionScore[] = [];
-    const matrixSections: SectionType[] = [];
+    const matrixAnalyses: CalculatedMatrixAnalysis[] = [];
     const countAnalyses: CalculatedCountAnalysis[] = [];
 
     for (const section of questionnaire.sections) {
@@ -139,7 +141,30 @@ export default function ReportDetailsPage() {
                 break;
             
             case 'matrix':
-                matrixSections.push(section);
+                if (section.questions.length < 2) {
+                    console.warn(`Matrix section "${section.name}" has fewer than 2 questions and will be skipped.`);
+                    break;
+                }
+                const q1 = section.questions[0];
+                const q2 = section.questions[1];
+
+                const selectedOptionId1 = response.responses[q1.id];
+                const selectedOption1 = q1.options.find(opt => opt.id === selectedOptionId1);
+                
+                const selectedOptionId2 = response.responses[q2.id];
+                const selectedOption2 = q2.options.find(opt => opt.id === selectedOptionId2);
+
+                if (selectedOption1 && selectedOption2) {
+                    matrixAnalyses.push({
+                        sectionId: section.id,
+                        sectionName: section.name,
+                        xAxisLabel: q1.question,
+                        yAxisLabel: q2.question,
+                        data: [
+                            { x: selectedOption1.score, y: selectedOption2.score, name: section.name }
+                        ],
+                    });
+                }
                 break;
 
             case 'count':
@@ -174,13 +199,13 @@ export default function ReportDetailsPage() {
         }
     }
 
-    const totalAverageRanking = weightedScores.reduce((sum, score) => {
-        return sum + (score.averageScore * score.sectionWeight);
+    const totalWeightedScoreSum = weightedScores.reduce((sum, score) => {
+        return sum + score.weightedAverageScore;
     }, 0);
     
     weightedScores.sort((a, b) => b.averageScore - a.averageScore);
 
-    return { weightedScores, matrixSections, countAnalyses, totalAverageRanking };
+    return { weightedScores, matrixAnalyses, countAnalyses, totalAverageRanking: totalWeightedScoreSum };
 
   }, [response, questionnaire]);
 
@@ -295,25 +320,49 @@ export default function ReportDetailsPage() {
         </section>
       )}
       
-      {reportData.matrixSections.length > 0 && (
-        <section>
+      {reportData.matrixAnalyses.length > 0 && (
+        <section className="page-break-before">
           <Separator className="my-6" />
           <h2 className="text-xl font-semibold mb-3 text-primary border-b pb-2">Double-Entry Matrix Analysis</h2>
-           {reportData.matrixSections.map(section => (
-               <Card key={section.id} className="bg-muted/30 p-4">
-                 <CardHeader className="p-0 pb-2"><CardTitle className="text-lg">{section.name}</CardTitle></CardHeader>
-                 <CardContent className="p-0">
-                    <p className="text-muted-foreground text-sm">
-                        Details for this matrix, including the visual plot, will be implemented in a future update.
-                    </p>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+           {reportData.matrixAnalyses.map(analysis => (
+               <Card key={analysis.sectionId}>
+                 <CardHeader>
+                    <CardTitle className="text-lg">{analysis.sectionName}</CardTitle>
+                    <CardDescription>A visual plot of the responses for this matrix.</CardDescription>
+                 </CardHeader>
+                 <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                        <ScatterChart
+                            margin={{ top: 20, right: 30, bottom: 40, left: 30 }}
+                        >
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis type="number" dataKey="x" name={analysis.xAxisLabel} domain={['dataMin - 1', 'dataMax + 1']}>
+                                <RechartsLabel value={analysis.xAxisLabel} offset={-25} position="insideBottom" fill="hsl(var(--foreground))" fontSize={12} />
+                            </XAxis>
+                            <YAxis type="number" dataKey="y" name={analysis.yAxisLabel} domain={['dataMin - 1', 'dataMax + 1']}>
+                                 <RechartsLabel value={analysis.yAxisLabel} angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} fill="hsl(var(--foreground))" fontSize={12} />
+                            </YAxis>
+                            <RechartsTooltip 
+                              cursor={{ strokeDasharray: '3 3' }} 
+                              contentStyle={{ 
+                                backgroundColor: 'hsl(var(--card))', 
+                                border: '1px solid hsl(var(--border))',
+                                borderRadius: 'var(--radius)' 
+                              }} 
+                            />
+                            <Scatter name={analysis.sectionName} data={analysis.data} fill="hsl(var(--primary))" r={10} />
+                        </ScatterChart>
+                    </ResponsiveContainer>
                  </CardContent>
               </Card>
            ))}
+           </div>
         </section>
       )}
 
       {reportData.countAnalyses.length > 0 && (
-        <section>
+        <section className="page-break-before">
             <Separator className="my-6" />
             <h2 className="text-xl font-semibold mb-3 text-primary border-b pb-2">Response Count Analysis</h2>
             <div className="space-y-4">

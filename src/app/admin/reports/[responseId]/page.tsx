@@ -110,16 +110,28 @@ export default function ReportDetailsPage() {
     let overallHighestScore = 4;
 
     for (const section of questionnaire.sections) {
-        // Do not default the type. Only process sections with a recognized type.
-        const type = section.type;
-
         // Determine the highest possible score across all questions for normalization
         const sectionMaxScore = getHighestPossibleOptionScore(section.questions);
         if (sectionMaxScore > overallHighestScore) {
             overallHighestScore = sectionMaxScore;
         }
+        
+        let sectionType = section.type;
 
-        if (type === 'weighted') {
+        // For backward compatibility, if type is not set, infer it.
+        if (!sectionType) {
+          if (section.weight > 0) {
+            sectionType = 'weighted';
+          } else if (section.questions.length === 2) {
+            // Heuristic: If weight is 0 and there are 2 questions, it's likely a matrix.
+            sectionType = 'matrix';
+          } else {
+            // Fallback for non-weighted, non-matrix sections.
+            sectionType = 'count';
+          }
+        }
+
+        if (sectionType === 'weighted') {
             let achievedScore = 0;
             let maxPossibleScoreInSection = 0;
             
@@ -146,7 +158,7 @@ export default function ReportDetailsPage() {
                 weightedAverageScore: parseFloat((averageScore * section.weight).toFixed(2)),
                 numQuestionsInSection: section.questions.length,
             });
-        } else if (type === 'matrix') {
+        } else if (sectionType === 'matrix') {
             if (section.questions.length < 2) {
                 console.warn(`Matrix section "${section.name}" has fewer than 2 questions and will be skipped.`);
                 continue;
@@ -171,7 +183,7 @@ export default function ReportDetailsPage() {
                     ],
                 });
             }
-        } else if (type === 'count') {
+        } else if (sectionType === 'count') {
             const answerCounts: Record<string, number> = {};
             
             section.questions.forEach(q => {
@@ -432,3 +444,5 @@ export default function ReportDetailsPage() {
     </div>
   );
 }
+
+    

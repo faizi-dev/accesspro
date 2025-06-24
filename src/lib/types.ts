@@ -109,6 +109,8 @@ export interface CalculatedMatrixAnalysis {
   xAxisLabel: string;
   yAxisLabel: string;
   data: { x: number; y: number; name: string, parent: any }[];
+  xAxisDomain: [number, number];
+  yAxisDomain: [number, number];
 }
 
 

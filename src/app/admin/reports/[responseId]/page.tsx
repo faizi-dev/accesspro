@@ -219,6 +219,22 @@ export default function ReportDetailsPage() {
       if (xSection && ySection) {
           const xAxisLabel = xSection.name || "X-Axis";
           const yAxisLabel = ySection.name || "Y-Axis";
+
+          const xQuestion = xSection.questions?.[0];
+          const yQuestion = ySection.questions?.[0];
+
+          let xAxisDomain: [number, number] = [0, 5]; // Default fallback
+          if (xQuestion?.options?.length > 0) {
+              const xMax = Math.max(...xQuestion.options.map(o => o.score));
+              xAxisDomain = [0, xMax];
+          }
+
+          let yAxisDomain: [number, number] = [0, 5]; // Default fallback
+          if (yQuestion?.options?.length > 0) {
+              const yMax = Math.max(...yQuestion.options.map(o => o.score));
+              yAxisDomain = [0, yMax];
+          }
+
           const matrixData = {
               sectionId: 'combined-matrix',
               sectionName: 'Double-Entry Matrix Analysis',
@@ -230,6 +246,8 @@ export default function ReportDetailsPage() {
                   name: 'Assessment Result',
                   parent: { xAxisLabel, yAxisLabel }
               }],
+              xAxisDomain,
+              yAxisDomain,
           };
           matrixAnalyses.push(matrixData);
       }
@@ -593,10 +611,22 @@ export default function ReportDetailsPage() {
                             margin={{ top: 20, right: 30, bottom: 40, left: 30 }}
                         >
                             <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis type="number" dataKey="x" name={analysis.xAxisLabel} domain={['dataMin - 1', 'dataMax + 1']}>
+                            <XAxis 
+                                type="number" 
+                                dataKey="x" 
+                                name={analysis.xAxisLabel} 
+                                domain={analysis.xAxisDomain}
+                                allowDecimals={false}
+                            >
                                 <RechartsLabel value={analysis.xAxisLabel} offset={-25} position="insideBottom" fill="hsl(var(--foreground))" fontSize={12} />
                             </XAxis>
-                            <YAxis type="number" dataKey="y" name={analysis.yAxisLabel} domain={['dataMin - 1', 'dataMax + 1']}>
+                            <YAxis 
+                                type="number" 
+                                dataKey="y" 
+                                name={analysis.yAxisLabel} 
+                                domain={analysis.yAxisDomain}
+                                allowDecimals={false}
+                            >
                                  <RechartsLabel value={analysis.yAxisLabel} angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} fill="hsl(var(--foreground))" fontSize={12} />
                             </YAxis>
                             <RechartsTooltip 

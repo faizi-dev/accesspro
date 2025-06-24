@@ -110,97 +110,93 @@ export default function ReportDetailsPage() {
     let overallHighestScore = 4;
 
     for (const section of questionnaire.sections) {
-        const type = section.type || 'weighted';
+        // Do not default the type. Only process sections with a recognized type.
+        const type = section.type;
 
+        // Determine the highest possible score across all questions for normalization
         const sectionMaxScore = getHighestPossibleOptionScore(section.questions);
         if (sectionMaxScore > overallHighestScore) {
             overallHighestScore = sectionMaxScore;
         }
 
-        switch (type) {
-            case 'weighted':
-                let achievedScore = 0;
-                let maxPossibleScoreInSection = 0;
-                
-                section.questions.forEach(q => {
-                    const selectedOptionId = response.responses[q.id];
-                    const selectedOption = q.options.find(opt => opt.id === selectedOptionId);
-                    if (selectedOption) {
-                        achievedScore += selectedOption.score;
-                    }
-                    maxPossibleScoreInSection += Math.max(...q.options.map(opt => opt.score), 0);
-                });
-
-                const averageScore = section.questions.length > 0 
-                    ? parseFloat((achievedScore / section.questions.length).toFixed(2)) 
-                    : 0;
-                
-                weightedScores.push({
-                    sectionId: section.id,
-                    sectionName: section.name,
-                    sectionWeight: section.weight,
-                    achievedScore,
-                    maxPossibleScore: maxPossibleScoreInSection,
-                    averageScore,
-                    weightedAverageScore: parseFloat((averageScore * section.weight).toFixed(2)),
-                    numQuestionsInSection: section.questions.length,
-                });
-                break;
+        if (type === 'weighted') {
+            let achievedScore = 0;
+            let maxPossibleScoreInSection = 0;
             
-            case 'matrix':
-                if (section.questions.length < 2) {
-                    console.warn(`Matrix section "${section.name}" has fewer than 2 questions and will be skipped.`);
-                    break;
+            section.questions.forEach(q => {
+                const selectedOptionId = response.responses[q.id];
+                const selectedOption = q.options.find(opt => opt.id === selectedOptionId);
+                if (selectedOption) {
+                    achievedScore += selectedOption.score;
                 }
-                const q1 = section.questions[0];
-                const q2 = section.questions[1];
+                maxPossibleScoreInSection += Math.max(...q.options.map(opt => opt.score), 0);
+            });
 
-                const selectedOptionId1 = response.responses[q1.id];
-                const selectedOption1 = q1.options.find(opt => opt.id === selectedOptionId1);
-                
-                const selectedOptionId2 = response.responses[q2.id];
-                const selectedOption2 = q2.options.find(opt => opt.id === selectedOptionId2);
+            const averageScore = section.questions.length > 0 
+                ? parseFloat((achievedScore / section.questions.length).toFixed(2)) 
+                : 0;
+            
+            weightedScores.push({
+                sectionId: section.id,
+                sectionName: section.name,
+                sectionWeight: section.weight,
+                achievedScore,
+                maxPossibleScore: maxPossibleScoreInSection,
+                averageScore,
+                weightedAverageScore: parseFloat((averageScore * section.weight).toFixed(2)),
+                numQuestionsInSection: section.questions.length,
+            });
+        } else if (type === 'matrix') {
+            if (section.questions.length < 2) {
+                console.warn(`Matrix section "${section.name}" has fewer than 2 questions and will be skipped.`);
+                continue;
+            }
+            const q1 = section.questions[0];
+            const q2 = section.questions[1];
 
-                if (selectedOption1 && selectedOption2) {
-                    matrixAnalyses.push({
-                        sectionId: section.id,
-                        sectionName: section.name,
-                        xAxisLabel: q1.question,
-                        yAxisLabel: q2.question,
-                        data: [
-                            { x: selectedOption1.score, y: selectedOption2.score, name: section.name }
-                        ],
-                    });
-                }
-                break;
+            const selectedOptionId1 = response.responses[q1.id];
+            const selectedOption1 = q1.options.find(opt => opt.id === selectedOptionId1);
+            
+            const selectedOptionId2 = response.responses[q2.id];
+            const selectedOption2 = q2.options.find(opt => opt.id === selectedOptionId2);
 
-            case 'count':
-                const answerCounts: Record<string, number> = {};
-                
-                section.questions.forEach(q => {
-                    const selectedOptionId = response.responses[q.id];
-                    const selectedOption = q.options.find(opt => opt.id === selectedOptionId);
-                    if (selectedOption) {
-                        answerCounts[selectedOption.text] = (answerCounts[selectedOption.text] || 0) + 1;
-                    }
-                });
-                
-                let mostFrequentAnswers: string[] = [];
-                let maxCount = 0;
-                if (Object.keys(answerCounts).length > 0) {
-                    maxCount = Math.max(...Object.values(answerCounts));
-                    mostFrequentAnswers = Object.keys(answerCounts).filter(
-                        text => answerCounts[text] === maxCount
-                    );
-                }
-
-                countAnalyses.push({
+            if (selectedOption1 && selectedOption2) {
+                matrixAnalyses.push({
                     sectionId: section.id,
                     sectionName: section.name,
-                    answerCounts,
-                    mostFrequentAnswers,
+                    xAxisLabel: q1.question,
+                    yAxisLabel: q2.question,
+                    data: [
+                        { x: selectedOption1.score, y: selectedOption2.score, name: section.name }
+                    ],
                 });
-                break;
+            }
+        } else if (type === 'count') {
+            const answerCounts: Record<string, number> = {};
+            
+            section.questions.forEach(q => {
+                const selectedOptionId = response.responses[q.id];
+                const selectedOption = q.options.find(opt => opt.id === selectedOptionId);
+                if (selectedOption) {
+                    answerCounts[selectedOption.text] = (answerCounts[selectedOption.text] || 0) + 1;
+                }
+            });
+            
+            let mostFrequentAnswers: string[] = [];
+            let maxCount = 0;
+            if (Object.keys(answerCounts).length > 0) {
+                maxCount = Math.max(...Object.values(answerCounts));
+                mostFrequentAnswers = Object.keys(answerCounts).filter(
+                    text => answerCounts[text] === maxCount
+                );
+            }
+
+            countAnalyses.push({
+                sectionId: section.id,
+                sectionName: section.name,
+                answerCounts,
+                mostFrequentAnswers,
+            });
         }
     }
 
@@ -280,17 +276,19 @@ export default function ReportDetailsPage() {
       
       <Separator className="my-6" />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl text-center">Total Average Ranking</CardTitle>
-        </CardHeader>
-        <CardContent className="text-center">
-            <p className={`text-5xl font-bold ${getScoreTextColorClassName(reportData.totalAverageRanking)}`}>{reportData.totalAverageRanking.toFixed(2)}</p>
-            <p className="text-sm text-muted-foreground mt-1">Weighted composite score from all scored areas.</p>
-        </CardContent>
-      </Card>
+      {reportData.weightedScores.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl text-center">Total Average Ranking</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center">
+                <p className={`text-5xl font-bold ${getScoreTextColorClassName(reportData.totalAverageRanking)}`}>{reportData.totalAverageRanking.toFixed(2)}</p>
+                <p className="text-sm text-muted-foreground mt-1">Weighted composite score from all scored areas.</p>
+            </CardContent>
+          </Card>
+      )}
 
-      {/* Section for Weighted Scores */}
+      {/* Section for Weighted Scores (Bars) */}
       {reportData.weightedScores.length > 0 && (
         <Card>
           <CardHeader>
@@ -321,11 +319,11 @@ export default function ReportDetailsPage() {
         </Card>
       )}
       
-      {/* Section for Matrix Analysis */}
+      {/* Section for Matrix Analysis (Scatter Plots) */}
       {reportData.matrixAnalyses.length > 0 && (
         <section className="page-break-before">
           <Separator className="my-6" />
-          <h2 className="text-xl font-semibold mb-3 text-primary border-b pb-2">Double-Entry Matrix Analysis</h2>
+          <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Double-Entry Matrix Analysis</h2>
            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
            {reportData.matrixAnalyses.map(analysis => (
                <Card key={analysis.sectionId}>
@@ -363,11 +361,11 @@ export default function ReportDetailsPage() {
         </section>
       )}
 
-      {/* Section for Count Analysis */}
+      {/* Section for Count Analysis (Tables) */}
       {reportData.countAnalyses.length > 0 && (
         <section className="page-break-before">
             <Separator className="my-6" />
-            <h2 className="text-xl font-semibold mb-3 text-primary border-b pb-2">Response Count Analysis</h2>
+            <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Response Count Analysis</h2>
             <div className="space-y-4">
             {reportData.countAnalyses.map(analysis => (
                 <Card key={analysis.sectionId}>

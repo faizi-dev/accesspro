@@ -125,32 +125,16 @@ export default function ReportDetailsPage() {
     const countAnalyses: CalculatedCountAnalysis[] = [];
     let overallHighestScore = 4;
 
-    for (const section of questionnaire.sections) {
-        // Determine the highest possible score across all questions for normalization
+    questionnaire.sections.forEach((section, index) => {
         const sectionMaxScore = getHighestPossibleOptionScore(section.questions);
         if (sectionMaxScore > overallHighestScore) {
             overallHighestScore = sectionMaxScore;
         }
-        
-        let sectionType = section.type;
 
-        // For backward compatibility, if type is not set, infer it.
-        if (!sectionType) {
-          if (section.weight > 0) {
-            sectionType = 'weighted';
-          } else if (section.questions.length === 2 && section.questions.every(q => q.options.length >= 2)) {
-            // Heuristic: If weight is 0, 2 questions, it's likely a matrix.
-            sectionType = 'matrix';
-          } else {
-            // Fallback for non-weighted, non-matrix sections.
-            sectionType = 'count';
-          }
-        }
-
-        if (sectionType === 'weighted') {
+        // Sections 1-7 (index 0-6) are WEIGHTED
+        if (index < 7) {
             let achievedScore = 0;
             let numAnswered = 0;
-            
             section.questions.forEach(q => {
                 const selectedOptionId = response.responses[q.id];
                 const selectedOption = q.options.find(opt => opt.id === selectedOptionId);
@@ -159,11 +143,7 @@ export default function ReportDetailsPage() {
                     numAnswered++;
                 }
             });
-
-            const averageScore = numAnswered > 0 
-                ? parseFloat((achievedScore / numAnswered).toFixed(2)) 
-                : 0;
-            
+            const averageScore = numAnswered > 0 ? parseFloat((achievedScore / numAnswered).toFixed(2)) : 0;
             weightedScores.push({
                 sectionId: section.id,
                 sectionName: section.name,
@@ -172,17 +152,17 @@ export default function ReportDetailsPage() {
                 averageScore,
                 weightedAverageScore: parseFloat((averageScore * section.weight).toFixed(2)),
             });
-        } else if (sectionType === 'matrix') {
+        }
+        // Sections 8-9 (index 7-8) are MATRIX
+        else if (index === 7 || index === 8) {
             if (section.questions.length < 2) {
-                console.warn(`Matrix section "${section.name}" has fewer than 2 questions and will be skipped.`);
-                continue;
+                console.warn(`Matrix section "${section.name}" (index ${index}) has fewer than 2 questions and will be skipped.`);
+                return; // continue to next iteration
             }
             const q1 = section.questions[0];
             const q2 = section.questions[1];
-
             const selectedOptionId1 = response.responses[q1.id];
             const selectedOption1 = q1.options.find(opt => opt.id === selectedOptionId1);
-            
             const selectedOptionId2 = response.responses[q2.id];
             const selectedOption2 = q2.options.find(opt => opt.id === selectedOptionId2);
 
@@ -192,14 +172,13 @@ export default function ReportDetailsPage() {
                     sectionName: section.name,
                     xAxisLabel: q1.question,
                     yAxisLabel: q2.question,
-                    data: [
-                        { x: selectedOption1.score, y: selectedOption2.score, name: section.name }
-                    ],
+                    data: [{ x: selectedOption1.score, y: selectedOption2.score, name: section.name }],
                 });
             }
-        } else if (sectionType === 'count') {
+        }
+        // Section 10 (index 9) is COUNT
+        else if (index === 9) {
             const answerCounts: Record<string, number> = {};
-            
             section.questions.forEach(q => {
                 const selectedOptionId = response.responses[q.id];
                 const selectedOption = q.options.find(opt => opt.id === selectedOptionId);
@@ -207,16 +186,12 @@ export default function ReportDetailsPage() {
                     answerCounts[selectedOption.text] = (answerCounts[selectedOption.text] || 0) + 1;
                 }
             });
-            
             let mostFrequentAnswers: string[] = [];
             let maxCount = 0;
             if (Object.keys(answerCounts).length > 0) {
                 maxCount = Math.max(...Object.values(answerCounts));
-                mostFrequentAnswers = Object.keys(answerCounts).filter(
-                    text => answerCounts[text] === maxCount
-                );
+                mostFrequentAnswers = Object.keys(answerCounts).filter(text => answerCounts[text] === maxCount);
             }
-
             countAnalyses.push({
                 sectionId: section.id,
                 sectionName: section.name,
@@ -224,7 +199,7 @@ export default function ReportDetailsPage() {
                 mostFrequentAnswers,
             });
         }
-    }
+    });
 
     const totalAverageRanking = weightedScores.reduce((sum, score) => {
         return sum + score.weightedAverageScore;

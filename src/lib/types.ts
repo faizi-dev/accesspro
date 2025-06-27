@@ -154,7 +154,7 @@ export interface AdminUser {
 }
 
 export interface EmailTemplate {
-  id: 'newAssessment' | 'assessmentCompleted';
+  id: 'newAssessment' | 'assessmentCompleted' | 'reminder7Day' | 'reminder2DayCustomer' | 'reminder2DayAdmin';
   subject: string;
   body: string; // HTML body
   placeholders: string[];

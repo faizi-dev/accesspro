@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, type FormEvent } from 'react';
@@ -11,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, Save, Loader2 } from 'lucide-react';
+import { Mail, Save, Loader2, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 
@@ -38,7 +39,38 @@ const defaultTemplates: Record<string, Omit<EmailTemplate, 'id'>> = {
 <p>The AssessPro Team</p>
     `.trim(),
     placeholders: ['{{customerName}}', '{{questionnaireName}}'],
-  }
+  },
+  reminder7Day: {
+    subject: "Reminder: Your assessment link expires in 7 days",
+    body: `
+<p>Hello {{customerName}},</p>
+<p>This is a friendly reminder that your link to complete the <strong>{{questionnaireName}}</strong> assessment will expire in 7 days, on {{expiryDate}}.</p>
+<p>You can continue your assessment here: <a href="{{assessmentLink}}">Continue Assessment</a></p>
+<p>Thank you,</p>
+<p>The AssessPro Team</p>
+    `.trim(),
+    placeholders: ['{{customerName}}', '{{questionnaireName}}', '{{assessmentLink}}', '{{expiryDate}}'],
+  },
+  reminder2DayCustomer: {
+    subject: "Urgent: Your assessment link expires in 2 days",
+    body: `
+<p>Hello {{customerName}},</p>
+<p>This is a final reminder that your link to complete the <strong>{{questionnaireName}}</strong> assessment will expire in just 2 days, on {{expiryDate}}.</p>
+<p>Please complete it at your earliest convenience: <a href="{{assessmentLink}}">Complete Your Assessment Now</a></p>
+<p>Thank you,</p>
+<p>The AssessPro Team</p>
+    `.trim(),
+    placeholders: ['{{customerName}}', '{{questionnaireName}}', '{{assessmentLink}}', '{{expiryDate}}'],
+  },
+  reminder2DayAdmin: {
+    subject: "Admin Alert: Uncompleted Assessment for {{customerName}}",
+    body: `
+<p>Hello Admin,</p>
+<p>This is an automated notification that the assessment for <strong>{{customerName}}</strong> ({{customerEmail}}) has not been completed.</p>
+<p>The link for the "{{questionnaireName}}" assessment is set to expire in 2 days, on {{expiryDate}}.</p>
+    `.trim(),
+    placeholders: ['{{customerName}}', '{{customerEmail}}', '{{questionnaireName}}', '{{expiryDate}}'],
+  },
 };
 
 export default function EmailSettingsPage() {
@@ -127,8 +159,8 @@ export default function EmailSettingsPage() {
                         disabled={isSaving[templateId]}
                     />
                 </div>
-                <div className="flex items-center justify-between">
-                     <div className="text-sm text-muted-foreground space-x-1">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                     <div className="text-sm text-muted-foreground flex items-center flex-wrap gap-1">
                         <span>Placeholders:</span>
                         {template.placeholders.map(p => <Badge key={p} variant="secondary" className="font-mono">{p}</Badge>)}
                     </div>
@@ -156,11 +188,22 @@ export default function EmailSettingsPage() {
         </CardHeader>
       </Card>
       
+      <Card className="border-yellow-500 bg-yellow-50/50">
+          <CardHeader className="flex flex-row items-start gap-4">
+              <AlertTriangle className="h-6 w-6 text-yellow-700 mt-1"/>
+              <div>
+                  <CardTitle className="text-yellow-800">Reminder System Setup</CardTitle>
+                  <CardDescription className="text-yellow-700">
+                      The reminder emails below require a scheduled task (cron job) to run daily. You must set up an external service to send a GET request to <code className="font-mono bg-yellow-200/50 px-1 py-0.5 rounded">/api/cron/send-reminders</code> with an <code className="font-mono bg-yellow-200/50 px-1 py-0.5 rounded">Authorization: Bearer YOUR_CRON_SECRET</code> header.
+                  </CardDescription>
+              </div>
+          </CardHeader>
+      </Card>
+
       <div className="space-y-6">
         {isLoading ? (
             <>
-                <Skeleton className="h-64 w-full" />
-                <Skeleton className="h-64 w-full" />
+                {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-64 w-full" />)}
             </>
         ) : (
             <>
@@ -173,6 +216,23 @@ export default function EmailSettingsPage() {
                     templateId="assessmentCompleted"
                     title="Assessment Completion Email"
                     description="This email is sent to a customer immediately after they successfully submit their questionnaire."
+                />
+                <hr/>
+                <h3 className="text-xl font-semibold text-center text-muted-foreground pt-4">Automated Reminder Templates</h3>
+                <TemplateEditor 
+                    templateId="reminder7Day"
+                    title="7-Day Reminder Email (for Customer)"
+                    description="Sent 7 days before the assessment link expires."
+                />
+                <TemplateEditor 
+                    templateId="reminder2DayCustomer"
+                    title="2-Day Reminder Email (for Customer)"
+                    description="Sent 2 days before the assessment link expires."
+                />
+                 <TemplateEditor 
+                    templateId="reminder2DayAdmin"
+                    title="2-Day Uncompleted Alert (for Admin)"
+                    description="Sent to the admin when an assessment is uncompleted 2 days before expiry. It is sent to the email specified in the SMTP_FROM_EMAIL environment variable."
                 />
             </>
         )}

@@ -1,10 +1,10 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { db } from '@/lib/firebase/config';
-import { collection, getDocs, query, orderBy, Timestamp, where } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, Timestamp } from 'firebase/firestore';
 import type { CustomerResponse } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -17,10 +17,12 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { FileSearch, ArrowRight, AlertTriangle, Loader2 } from 'lucide-react';
+import { FileSearch, ArrowRight, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+
+type SortKey = 'customerName' | 'questionnaireVersionName' | 'submittedAt';
 
 export default function AdminReportsListPage() {
   useRequireAuth();
@@ -28,12 +30,12 @@ export default function AdminReportsListPage() {
 
   const [responses, setResponses] = useState<CustomerResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' }>({ key: 'submittedAt', direction: 'descending' });
 
   useEffect(() => {
     const fetchCompletedResponses = async () => {
       setIsLoading(true);
       try {
-        // Fetching directly from customerResponses collection
         const responsesQuery = query(
           collection(db, 'customerResponses'),
           orderBy('submittedAt', 'desc')
@@ -43,7 +45,7 @@ export default function AdminReportsListPage() {
         const fetchedResponses = querySnapshot.docs.map(docSnap => {
           const data = docSnap.data();
           return {
-            id: docSnap.id, // This ID is the original linkId
+            id: docSnap.id,
             ...data,
             submittedAt: (data.submittedAt as Timestamp)?.toDate ? (data.submittedAt as Timestamp).toDate() : new Date(data.submittedAt),
           } as CustomerResponse;
@@ -58,6 +60,55 @@ export default function AdminReportsListPage() {
     };
     fetchCompletedResponses();
   }, [toast]);
+  
+  const requestSort = (key: SortKey) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+        direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedResponses = useMemo(() => {
+    let sortableItems = [...responses];
+    if (sortConfig.key) {
+      sortableItems.sort((a, b) => {
+        const key = sortConfig.key;
+        let aValue: any = a[key as keyof CustomerResponse];
+        let bValue: any = b[key as keyof CustomerResponse];
+
+        if (aValue === undefined || aValue === null || aValue === '') return 1;
+        if (bValue === undefined || bValue === null || bValue === '') return -1;
+        
+        if (key === 'submittedAt') {
+          return (aValue.getTime() - bValue.getTime()) * (sortConfig.direction === 'ascending' ? 1 : -1);
+        }
+
+        aValue = String(aValue).toLowerCase();
+        bValue = String(bValue).toLowerCase();
+
+        if (aValue < bValue) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [responses, sortConfig]);
+
+  const SortableHeader = ({ sortKey, children, className }: { sortKey: SortKey, children: React.ReactNode, className?: string }) => (
+    <TableHead className={className}>
+      <Button variant="ghost" onClick={() => requestSort(sortKey)} className="px-2 py-1 h-auto">
+        {children}
+        {sortConfig.key === sortKey ? (
+          sortConfig.direction === 'ascending' ? <ArrowUp className="ml-2 h-4 w-4 inline-block" /> : <ArrowDown className="ml-2 h-4 w-4 inline-block" />
+        ) : <ArrowUpDown className="ml-2 h-4 w-4 inline-block opacity-30" />}
+      </Button>
+    </TableHead>
+  );
 
   if (isLoading) {
     return (
@@ -105,14 +156,14 @@ export default function AdminReportsListPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Customer Name</TableHead>
-                  <TableHead>Questionnaire</TableHead>
-                  <TableHead>Submitted At</TableHead>
+                  <SortableHeader sortKey="customerName">Customer Name</SortableHeader>
+                  <SortableHeader sortKey="questionnaireVersionName">Questionnaire</SortableHeader>
+                  <SortableHeader sortKey="submittedAt">Submitted At</SortableHeader>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {responses.map((response) => (
+                {sortedResponses.map((response) => (
                   <TableRow key={response.id}>
                     <TableCell className="font-medium">{response.customerName || 'N/A'}</TableCell>
                     <TableCell>{response.questionnaireVersionName}</TableCell>

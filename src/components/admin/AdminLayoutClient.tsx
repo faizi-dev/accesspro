@@ -30,6 +30,7 @@ import {
   UploadCloud,
   ShieldCheck,
   Home,
+  Mail,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -44,6 +45,7 @@ const navItems = [
   },
   { href: "/admin/customers", label: "Customers", icon: Users },
   { href: "/admin/reports", label: "Reports", icon: BarChart3 },
+  { href: "/admin/settings", label: "Email Settings", icon: Mail },
 ];
 
 export function AdminLayoutClient({ children }: { children: React.ReactNode }) {
@@ -99,7 +101,7 @@ export function AdminLayoutClient({ children }: { children: React.ReactNode }) {
                 <SidebarMenuItem key={item.href}>
                   <Link href={item.href} asChild>
                     <SidebarMenuButton
-                      isActive={pathname === item.href || (item.subItems && pathname.startsWith(item.href))}
+                      isActive={pathname === item.href || (item.subItems && pathname.startsWith(item.href)) || (item.href === "/admin/settings" && pathname.startsWith("/admin/settings"))}
                       tooltip={item.label}
                       className="justify-start"
                     >

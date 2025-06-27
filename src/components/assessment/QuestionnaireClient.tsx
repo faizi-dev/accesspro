@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import type { QuestionnaireVersion, Section, Question as QuestionType, AnswerOption, CustomerLink } from '@/lib/types';
+import type { QuestionnaireVersion, Section, Question as QuestionType, AnswerOption, CustomerLink, EmailTemplate } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
@@ -161,6 +161,34 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
         responsesInProgress: {}, 
         currentSectionIndex: questionnaire.sections.length, 
       });
+
+      // Send completion email
+      const templateRef = doc(db, 'emailTemplates', 'assessmentCompleted');
+      const templateSnap = await getDoc(templateRef);
+      if (templateSnap.exists()) {
+          try {
+              const template = templateSnap.data() as EmailTemplate;
+              let { subject, body } = template;
+              
+              const customerName = fetchedCustomerLinkData.customerName || customerLink.customerName || "N/A";
+              const customerEmail = fetchedCustomerLinkData.customerEmail || customerLink.customerEmail || "";
+              const questionnaireName = questionnaire.name;
+
+              subject = subject.replace(/{{customerName}}/g, customerName).replace(/{{questionnaireName}}/g, questionnaireName);
+              body = body.replace(/{{customerName}}/g, customerName).replace(/{{questionnaireName}}/g, questionnaireName);
+
+              if(customerEmail) {
+                  await fetch('/api/send-email', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ to: customerEmail, subject, html: body }),
+                  });
+              }
+          } catch (emailError) {
+              console.error("Failed to send completion email:", emailError);
+              // Do not block user flow if email fails.
+          }
+      }
 
       router.push(`/assessment/${linkId}/completed`);
     } catch (error) {

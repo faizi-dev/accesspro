@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, type FormEvent, type ChangeEvent } from '
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { db } from '@/lib/firebase/config';
 import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
-import type { Customer, CustomerLink, QuestionnaireVersion } from '@/lib/types';
+import type { Customer, CustomerLink, QuestionnaireVersion, EmailTemplate } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -259,6 +259,43 @@ export default function AdminCustomersPage() {
     setIsLoadingLinks(false);
   };
 
+  const sendNotificationEmail = async (templateId: string, recipientEmail: string, data: Record<string, string>) => {
+    try {
+        const templateRef = doc(db, 'emailTemplates', templateId);
+        const templateSnap = await getDoc(templateRef);
+        if (!templateSnap.exists()) {
+            console.error(`Email template ${templateId} not found.`);
+            toast({ variant: 'destructive', title: 'Email Not Sent', description: 'The email template could not be found.' });
+            return;
+        }
+
+        const template = templateSnap.data() as EmailTemplate;
+        let { subject, body } = template;
+
+        for (const key in data) {
+            subject = subject.replace(new RegExp(`{{${key}}}`, 'g'), data[key]);
+            body = body.replace(new RegExp(`{{${key}}}`, 'g'), data[key]);
+        }
+
+        const response = await fetch('/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: recipientEmail, subject, html: body }),
+        });
+
+        if (response.ok) {
+            toast({ title: 'Notification Sent', description: `An email has been sent to ${recipientEmail}.` });
+        } else {
+            const errorData = await response.json();
+            throw new Error(errorData.details || 'Failed to send email from server.');
+        }
+
+    } catch (error: any) {
+        console.error('Failed to send notification email:', error);
+        toast({ variant: 'destructive', title: 'Email Failed', description: error.message || 'The notification email could not be sent.' });
+    }
+  };
+
   const handleGenerateLink = async (e: FormEvent) => {
     e.preventDefault();
     if (!selectedCustomer || !selectedQuestionnaireId || !linkExpiresAt) {
@@ -284,7 +321,21 @@ export default function AdminCustomersPage() {
         expiresAt: Timestamp.fromDate(linkExpiresAt),
         status: "pending",
       });
+      
       toast({ title: "Link Generated", description: `New assessment link created for ${selectedCustomer.firstName}.` });
+
+      // Send email notification
+      await sendNotificationEmail(
+        'newAssessment',
+        selectedCustomer.email,
+        {
+          customerName: `${selectedCustomer.firstName} ${selectedCustomer.lastName || ''}`.trim(),
+          questionnaireName: version.name,
+          assessmentLink: `${window.location.origin}/assessment/${linkId}`,
+          expiryDate: format(linkExpiresAt, "PPP"),
+        }
+      );
+
       setIsGenerateLinkOpen(false);
       setSelectedQuestionnaireId('');
       setLinkExpiresAt(addDays(new Date(), 14));
@@ -686,3 +737,4 @@ export default function AdminCustomersPage() {
     
 
     
+

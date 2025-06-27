@@ -47,6 +47,7 @@ export interface SectionUpload {
   matrix_axis?: 'x' | 'y';
   questions: Array<Omit<Question, 'id'> & {
     tempId?: string,
+    additional_text?: string,
     options: Array<Omit<AnswerOption, 'id'> & { tempId?: string }>
   }>;
 }
@@ -150,4 +151,11 @@ export interface CustomerResponse {
 export interface AdminUser {
   uid: string;
   email: string | null;
+}
+
+export interface EmailTemplate {
+  id: 'newAssessment' | 'assessmentCompleted';
+  subject: string;
+  body: string; // HTML body
+  placeholders: string[];
 }

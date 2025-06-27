@@ -106,6 +106,8 @@ export interface CalculatedCountAnalysis {
 export interface CalculatedMatrixAnalysis {
   sectionId: string;
   sectionName: string;
+  xSectionId: string;
+  ySectionId: string;
   xAxisLabel: string;
   yAxisLabel: string;
   data: { x: number; y: number; name: string, parent: any }[];

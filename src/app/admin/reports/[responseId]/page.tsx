@@ -249,6 +249,8 @@ export default function ReportDetailsPage() {
 
           const matrixData = {
               sectionId: 'combined-matrix',
+              xSectionId: xSection.id,
+              ySectionId: ySection.id,
               sectionName: 'Double-Entry Matrix Analysis',
               xAxisLabel,
               yAxisLabel,
@@ -276,19 +278,27 @@ export default function ReportDetailsPage() {
   }, [response, questionnaire]);
 
   useEffect(() => {
-    if (reportData.barScores.length > 0) {
-      const initialSelection = reportData.barScores.reduce((acc, score) => {
-        acc[score.sectionId] = true;
+    if (questionnaire?.sections) {
+      const initialSelection = questionnaire.sections.reduce((acc, section) => {
+        acc[section.id] = true;
         return acc;
       }, {} as Record<string, boolean>);
       setSelectedSections(initialSelection);
     }
-  }, [reportData.barScores]);
+  }, [questionnaire]);
 
   const handleSectionSelectionChange = (sectionId: string, isSelected: boolean) => {
     setSelectedSections(prev => ({
       ...prev,
       [sectionId]: isSelected,
+    }));
+  };
+
+  const handleMatrixSelectionChange = (xId: string, yId: string, isSelected: boolean) => {
+    setSelectedSections(prev => ({
+        ...prev,
+        [xId]: isSelected,
+        [yId]: isSelected,
     }));
   };
 
@@ -342,15 +352,8 @@ export default function ReportDetailsPage() {
     const includedCountAnalyses = reportData.countAnalyses.filter(analysis => includedSectionIds.includes(analysis.sectionId));
     const includedSections = questionnaire.sections.filter(section => includedSectionIds.includes(section.id));
     
-    let shouldIncludeMatrix = reportData.matrixAnalyses.length > 0;
-    if (shouldIncludeMatrix && reportData.matrixAnalyses[0]) {
-        const xSection = questionnaire.sections.find(s => s.name === reportData.matrixAnalyses[0].xAxisLabel);
-        const ySection = questionnaire.sections.find(s => s.name === reportData.matrixAnalyses[0].yAxisLabel);
-        if ((xSection && !selectedSections[xSection.id]) || (ySection && !selectedSections[ySection.id])) {
-            shouldIncludeMatrix = false;
-        }
-    }
-
+    const matrixAnalysis = reportData.matrixAnalyses[0];
+    const shouldIncludeMatrix = matrixAnalysis && selectedSections[matrixAnalysis.xSectionId] && selectedSections[matrixAnalysis.ySectionId];
 
     try {
         let barChartImageBuffer: Buffer | undefined;
@@ -640,6 +643,10 @@ export default function ReportDetailsPage() {
   
   const sortedIncludedBarScores = [...reportData.barScores].filter(s => selectedSections[s.sectionId]).sort((a,b) => b.averageScore - a.averageScore);
   const includedCountAnalyses = reportData.countAnalyses.filter(analysis => selectedSections[analysis.sectionId]);
+  
+  const matrixAnalysis = reportData.matrixAnalyses[0];
+  const shouldIncludeMatrix = matrixAnalysis && selectedSections[matrixAnalysis.xSectionId] && selectedSections[matrixAnalysis.ySectionId];
+
 
   const staticExecutiveText = "This executive summary provides a high-level overview of the assessment results. Scores are color-coded for quick identification of strengths and areas for attention. Weighted averages reflect the relative importance of each area as defined in the questionnaire structure.";
 
@@ -805,7 +812,7 @@ export default function ReportDetailsPage() {
                                 </TableCell>
                                 <TableCell className="text-right">
                                      <Switch
-                                        checked={selectedSections[area.sectionId] ?? true}
+                                        checked={selectedSections[area.sectionId] ?? false}
                                         onCheckedChange={(checked) => handleSectionSelectionChange(area.sectionId, checked)}
                                         aria-label={`Toggle inclusion of ${area.sectionName} in export`}
                                     />
@@ -820,16 +827,26 @@ export default function ReportDetailsPage() {
       )}
       
       {/* --- MATRIX ANALYSIS --- */}
-      {reportData.matrixAnalyses.length > 0 && (
+      {matrixAnalysis && (
         <section ref={matrixChartRef} className="page-break-before">
           <Separator className="my-6" />
           <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Double-Entry Matrix Analysis</h2>
            <div className="grid grid-cols-1 gap-6">
-           {reportData.matrixAnalyses.map(analysis => (
-               <Card key={analysis.sectionId}>
-                 <CardHeader>
-                    <CardTitle className="text-lg">{analysis.sectionName}</CardTitle>
-                    <CardDescription>A visual plot of {analysis.xAxisLabel} vs. {analysis.yAxisLabel}.</CardDescription>
+               <Card>
+                 <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg">{matrixAnalysis.sectionName}</CardTitle>
+                      <CardDescription>A visual plot of {matrixAnalysis.xAxisLabel} vs. {matrixAnalysis.yAxisLabel}.</CardDescription>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <Label htmlFor={`matrix-switch`} className="text-sm">Include in Export</Label>
+                        <Switch
+                            id={`matrix-switch`}
+                            checked={!!(selectedSections[matrixAnalysis.xSectionId] && selectedSections[matrixAnalysis.ySectionId])}
+                            onCheckedChange={(checked) => handleMatrixSelectionChange(matrixAnalysis.xSectionId, matrixAnalysis.ySectionId, checked)}
+                            aria-label={`Toggle inclusion of ${matrixAnalysis.sectionName} in export`}
+                        />
+                    </div>
                  </CardHeader>
                  <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
@@ -840,20 +857,20 @@ export default function ReportDetailsPage() {
                             <XAxis 
                                 type="number" 
                                 dataKey="x" 
-                                name={analysis.xAxisLabel} 
-                                domain={analysis.xAxisDomain}
+                                name={matrixAnalysis.xAxisLabel} 
+                                domain={matrixAnalysis.xAxisDomain}
                                 allowDecimals={false}
                             >
-                                <RechartsLabel value={analysis.xAxisLabel} offset={-25} position="insideBottom" fill="hsl(var(--foreground))" fontSize={12} />
+                                <RechartsLabel value={matrixAnalysis.xAxisLabel} offset={-25} position="insideBottom" fill="hsl(var(--foreground))" fontSize={12} />
                             </XAxis>
                             <YAxis 
                                 type="number" 
                                 dataKey="y" 
-                                name={analysis.yAxisLabel} 
-                                domain={analysis.yAxisDomain}
+                                name={matrixAnalysis.yAxisLabel} 
+                                domain={matrixAnalysis.yAxisDomain}
                                 allowDecimals={false}
                             >
-                                 <RechartsLabel value={analysis.yAxisLabel} angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} fill="hsl(var(--foreground))" fontSize={12} />
+                                 <RechartsLabel value={matrixAnalysis.yAxisLabel} angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} fill="hsl(var(--foreground))" fontSize={12} />
                             </YAxis>
                             <RechartsTooltip 
                               cursor={{ strokeDasharray: '3 3' }} 
@@ -864,12 +881,11 @@ export default function ReportDetailsPage() {
                                 borderRadius: 'var(--radius)' 
                               }} 
                             />
-                            <Scatter name={analysis.sectionName} data={analysis.data} fill="hsl(var(--primary))" r={10} />
+                            <Scatter name={matrixAnalysis.sectionName} data={matrixAnalysis.data} fill="hsl(var(--primary))" r={10} />
                         </ScatterChart>
                     </ResponsiveContainer>
                  </CardContent>
               </Card>
-           ))}
            </div>
         </section>
       )}
@@ -882,7 +898,18 @@ export default function ReportDetailsPage() {
             <div className="space-y-4">
             {reportData.countAnalyses.map(analysis => (
                 <Card key={analysis.sectionId}>
-                    <CardHeader><CardTitle>{analysis.sectionName}</CardTitle></CardHeader>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                        <CardTitle>{analysis.sectionName}</CardTitle>
+                        <div className="flex items-center space-x-2">
+                           <Label htmlFor={`count-switch-${analysis.sectionId}`} className="text-sm">Include in Export</Label>
+                           <Switch
+                                id={`count-switch-${analysis.sectionId}`}
+                                checked={selectedSections[analysis.sectionId] ?? false}
+                                onCheckedChange={(checked) => handleSectionSelectionChange(analysis.sectionId, checked)}
+                                aria-label={`Toggle inclusion of ${analysis.sectionName} in export`}
+                            />
+                        </div>
+                    </CardHeader>
                     <CardContent>
                         <Table>
                             <TableHeader>

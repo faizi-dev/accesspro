@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
+import { useState, useEffect, useMemo, type FormEvent, type ChangeEvent } from 'react';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { db } from '@/lib/firebase/config';
 import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/select"
 import { DatePicker } from '@/components/ui/date-picker'; 
 import { useToast } from '@/hooks/use-toast';
-import { UsersRound, PlusCircle, ClipboardList, LinkIcon, Trash2, CalendarDays, FileSignature, ExternalLink, Edit } from 'lucide-react';
+import { UsersRound, PlusCircle, ClipboardList, LinkIcon, Trash2, CalendarDays, FileSignature, ExternalLink, Edit, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import Link from 'next/link';
 import { addDays, format } from 'date-fns';
@@ -65,6 +65,8 @@ const initialCustomerState = {
   province: '',
   need: '',
 };
+
+type SortKey = 'fullName' | 'email' | 'sector' | 'createdAt' | 'numberOfEmployees' | 'turnover' | 'province';
 
 export default function AdminCustomersPage() {
   useRequireAuth();
@@ -93,6 +95,9 @@ export default function AdminCustomersPage() {
   const [questionnaireVersions, setQuestionnaireVersions] = useState<QuestionnaireVersion[]>([]);
   const [selectedQuestionnaireId, setSelectedQuestionnaireId] = useState<string>('');
   const [linkExpiresAt, setLinkExpiresAt] = useState<Date | undefined>(addDays(new Date(), 7));
+  
+  // Sorting state
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' }>({ key: 'createdAt', direction: 'descending' });
 
   const fetchCustomers = async () => {
     setIsLoadingCustomers(true);
@@ -105,7 +110,7 @@ export default function AdminCustomersPage() {
         createdAt: (doc.data().createdAt as Timestamp)?.toDate ? (doc.data().createdAt as Timestamp).toDate() : new Date(doc.data().createdAt),
         returnDeadline: (doc.data().returnDeadline as Timestamp)?.toDate ? (doc.data().returnDeadline as Timestamp).toDate() : undefined,
       } as Customer));
-      setCustomers(fetchedCustomers.sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime()));
+      setCustomers(fetchedCustomers);
     } catch (error) {
       console.error("Error fetching customers:", error);
       toast({ variant: "destructive", title: "Error", description: "Could not fetch customers." });
@@ -302,6 +307,73 @@ export default function AdminCustomersPage() {
       });
     }
   };
+  
+  const requestSort = (key: SortKey) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+        direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+  
+  const sortedCustomers = useMemo(() => {
+    let sortableItems = [...customers];
+    if (sortConfig.key) {
+      sortableItems.sort((a, b) => {
+        const key = sortConfig.key;
+        let aValue: any;
+        let bValue: any;
+
+        if (key === 'fullName') {
+          aValue = `${a.firstName} ${a.lastName || ''}`.trim().toLowerCase();
+          bValue = `${b.firstName} ${b.lastName || ''}`.trim().toLowerCase();
+        } else {
+          aValue = a[key as keyof Customer];
+          bValue = b[key as keyof Customer];
+        }
+
+        if (aValue === undefined || aValue === null || aValue === '') return 1;
+        if (bValue === undefined || bValue === null || bValue === '') return -1;
+        
+        if (key === 'createdAt') {
+          return (a.createdAt.getTime() - b.createdAt.getTime()) * (sortConfig.direction === 'ascending' ? 1 : -1);
+        }
+
+        if (key === 'numberOfEmployees' || key === 'turnover') {
+          const numA = parseFloat(String(aValue).replace(/[^0-9.-]+/g, ""));
+          const numB = parseFloat(String(bValue).replace(/[^0-9.-]+/g, ""));
+          if (!isNaN(numA) && !isNaN(numB)) {
+            if (numA < numB) return sortConfig.direction === 'ascending' ? -1 : 1;
+            if (numA > numB) return sortConfig.direction === 'ascending' ? 1 : -1;
+            return 0;
+          }
+        }
+        
+        aValue = String(aValue).toLowerCase();
+        bValue = String(bValue).toLowerCase();
+
+        if (aValue < bValue) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [customers, sortConfig]);
+
+  const SortableHeader = ({ sortKey, children, className }: { sortKey: SortKey, children: React.ReactNode, className?: string }) => (
+    <TableHead className={className}>
+      <Button variant="ghost" onClick={() => requestSort(sortKey)} className="px-2 py-1 h-auto">
+        {children}
+        {sortConfig.key === sortKey ? (
+          sortConfig.direction === 'ascending' ? <ArrowUp className="ml-2 h-4 w-4 inline-block" /> : <ArrowDown className="ml-2 h-4 w-4 inline-block" />
+        ) : <ArrowUpDown className="ml-2 h-4 w-4 inline-block opacity-30" />}
+      </Button>
+    </TableHead>
+  );
 
   return (
     <div className="space-y-8">
@@ -381,7 +453,7 @@ export default function AdminCustomersPage() {
         <CardContent>
           {isLoadingCustomers ? (
              <div className="space-y-2">
-                {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+                {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
             </div>
           ) : customers.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">No customers found. Create one to get started!</p>
@@ -389,20 +461,24 @@ export default function AdminCustomersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Full Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Sector</TableHead>
-                  <TableHead>Created At</TableHead>
+                  <SortableHeader sortKey="fullName">Full Name</SortableHeader>
+                  <SortableHeader sortKey="email">Email</SortableHeader>
+                  <SortableHeader sortKey="sector">Sector</SortableHeader>
+                  <SortableHeader sortKey="numberOfEmployees">No. of Employees</SortableHeader>
+                  <SortableHeader sortKey="turnover">Turnover</SortableHeader>
+                  <SortableHeader sortKey="province">Province</SortableHeader>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {customers.map((customer) => (
+                {sortedCustomers.map((customer) => (
                   <TableRow key={customer.id}>
                     <TableCell className="font-medium">{`${customer.firstName} ${customer.lastName || ''}`.trim()}</TableCell>
                     <TableCell>{customer.email}</TableCell>
                     <TableCell>{customer.sector || 'N/A'}</TableCell>
-                    <TableCell>{customer.createdAt.toLocaleDateString()}</TableCell>
+                    <TableCell>{customer.numberOfEmployees || 'N/A'}</TableCell>
+                    <TableCell>{customer.turnover || 'N/A'}</TableCell>
+                    <TableCell>{customer.province || 'N/A'}</TableCell>
                     <TableCell className="text-right space-x-1">
                       <Button variant="outline" size="sm" onClick={() => openManageLinksDialog(customer)}>
                         <ClipboardList className="mr-2 h-4 w-4" /> Links

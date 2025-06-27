@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
+import { Switch } from '@/components/ui/switch';
 import { 
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Label as RechartsLabel,
 } from 'recharts';
@@ -89,6 +90,7 @@ export default function ReportDetailsPage() {
   const [executiveSummaryComment, setExecutiveSummaryComment] = useState("");
   const [isSavingComment, setIsSavingComment] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [selectedSections, setSelectedSections] = useState<Record<string, boolean>>({});
 
   const matrixChartRef = useRef<HTMLDivElement>(null);
   const barChartExportRef = useRef<HTMLDivElement>(null);
@@ -273,6 +275,23 @@ export default function ReportDetailsPage() {
 
   }, [response, questionnaire]);
 
+  useEffect(() => {
+    if (reportData.barScores.length > 0) {
+      const initialSelection = reportData.barScores.reduce((acc, score) => {
+        acc[score.sectionId] = true;
+        return acc;
+      }, {} as Record<string, boolean>);
+      setSelectedSections(initialSelection);
+    }
+  }, [reportData.barScores]);
+
+  const handleSectionSelectionChange = (sectionId: string, isSelected: boolean) => {
+    setSelectedSections(prev => ({
+      ...prev,
+      [sectionId]: isSelected,
+    }));
+  };
+
   const handleSaveComments = async () => {
     if (!responseId) return;
     setIsSavingComment(true);
@@ -303,7 +322,7 @@ export default function ReportDetailsPage() {
     }
   };
 
-    const sortedBarScores = [...reportData.barScores].sort((a,b) => b.averageScore - a.averageScore);
+  const sortedBarScores = [...reportData.barScores].sort((a,b) => b.averageScore - a.averageScore);
 
   const handleExportToDocx = async () => {
     if (!response || !questionnaire) {
@@ -312,23 +331,44 @@ export default function ReportDetailsPage() {
     }
     setIsDownloading(true);
 
+    const includedSectionIds = Object.keys(selectedSections).filter(id => selectedSections[id]);
+    if (includedSectionIds.length === 0) {
+        toast({ variant: 'destructive', title: 'No Sections Selected', description: 'Please select at least one section to include in the export.' });
+        setIsDownloading(false);
+        return;
+    }
+
+    const includedBarScores = reportData.barScores.filter(score => includedSectionIds.includes(score.sectionId));
+    const includedCountAnalyses = reportData.countAnalyses.filter(analysis => includedSectionIds.includes(analysis.sectionId));
+    const includedSections = questionnaire.sections.filter(section => includedSectionIds.includes(section.id));
+    
+    let shouldIncludeMatrix = reportData.matrixAnalyses.length > 0;
+    if (shouldIncludeMatrix && reportData.matrixAnalyses[0]) {
+        const xSection = questionnaire.sections.find(s => s.name === reportData.matrixAnalyses[0].xAxisLabel);
+        const ySection = questionnaire.sections.find(s => s.name === reportData.matrixAnalyses[0].yAxisLabel);
+        if ((xSection && !selectedSections[xSection.id]) || (ySection && !selectedSections[ySection.id])) {
+            shouldIncludeMatrix = false;
+        }
+    }
+
+
     try {
         let barChartImageBuffer: Buffer | undefined;
-        if (barChartExportRef.current) {
+        if (barChartExportRef.current && includedBarScores.length > 0) {
             const canvas = await html2canvas(barChartExportRef.current, { backgroundColor: '#FFFFFF', scale: 2 });
             const imageDataUrl = canvas.toDataURL('image/png');
             barChartImageBuffer = Buffer.from(imageDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
         }
         
         let matrixChartImageBuffer: Buffer | undefined;
-        if (matrixChartRef.current && reportData.matrixAnalyses.length > 0) {
+        if (matrixChartRef.current && shouldIncludeMatrix) {
             const canvas = await html2canvas(matrixChartRef.current, { backgroundColor: '#FFFFFF', scale: 2 });
             const imageDataUrl = canvas.toDataURL('image/png');
             matrixChartImageBuffer = Buffer.from(imageDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
         }
         
         let countAnalysisImageBuffer: Buffer | undefined;
-        if (countAnalysisExportRef.current && reportData.countAnalyses.length > 0) {
+        if (countAnalysisExportRef.current && includedCountAnalyses.length > 0) {
             const canvas = await html2canvas(countAnalysisExportRef.current, { backgroundColor: '#FFFFFF', scale: 2 });
             const imageDataUrl = canvas.toDataURL('image/png');
             countAnalysisImageBuffer = Buffer.from(imageDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
@@ -353,15 +393,20 @@ export default function ReportDetailsPage() {
         docSections.push(new Paragraph({ text: `Questionnaire: ${response.questionnaireVersionName}` }));
         docSections.push(new Paragraph({ text: `Submitted: ${format(response.submittedAt, 'PPP p')}`, spacing: { after: 240 } }));
 
-        if (reportData.barScores.length > 0) {
+        if (includedBarScores.length > 0) {
+             const totalAverageRankingForExport = includedBarScores.reduce((sum, score) => {
+                const weight = typeof score.sectionWeight === 'number' ? score.sectionWeight : 0;
+                return sum + (score.averageScore * weight);
+            }, 0);
+            
              docSections.push(createHeading('Total Average Ranking'));
              docSections.push(new Paragraph({
-                children: [new TextRun({ text: reportData.totalAverageRanking.toFixed(2), size: 48, bold: true })],
+                children: [new TextRun({ text: totalAverageRankingForExport.toFixed(2), size: 48, bold: true })],
                 alignment: AlignmentType.CENTER
              }));
         }
         
-        if (reportData.barScores.length > 0 && barChartImageBuffer) {
+        if (includedBarScores.length > 0 && barChartImageBuffer) {
             docSections.push(createHeading('Weighted Area Scores'));
             docSections.push(new Paragraph({
                 children: [
@@ -377,7 +422,7 @@ export default function ReportDetailsPage() {
             }));
         }
 
-        if (reportData.matrixAnalyses.length > 0 && matrixChartImageBuffer) {
+        if (shouldIncludeMatrix && matrixChartImageBuffer) {
             docSections.push(createHeading('Double-Entry Matrix Analysis'));
             docSections.push(new Paragraph({
                 children: [
@@ -393,7 +438,7 @@ export default function ReportDetailsPage() {
             }));
         }
 
-        if (reportData.countAnalyses.length > 0 && countAnalysisImageBuffer) {
+        if (includedCountAnalyses.length > 0 && countAnalysisImageBuffer) {
             docSections.push(createHeading('Response Count Analysis'));
             docSections.push(new Paragraph({
                 children: [
@@ -418,9 +463,9 @@ export default function ReportDetailsPage() {
         docSections.push(new Paragraph({ text: response.adminComments?.executiveSummary || "No executive summary comments added yet." }));
 
         // --- Detailed Section Pages ---
-        const barSections = questionnaire.sections.filter(s => s.type === 'bar');
+        const barSectionsForExport = includedSections.filter(s => s.type === 'bar');
 
-        for (const section of barSections) {
+        for (const section of barSectionsForExport) {
             docSections.push(new Paragraph({ pageBreakBefore: true }));
             docSections.push(createHeading(section.name, HeadingLevel.HEADING_2));
             if (section.description) {
@@ -593,6 +638,9 @@ export default function ReportDetailsPage() {
     );
   }
   
+  const sortedIncludedBarScores = [...reportData.barScores].filter(s => selectedSections[s.sectionId]).sort((a,b) => b.averageScore - a.averageScore);
+  const includedCountAnalyses = reportData.countAnalyses.filter(analysis => selectedSections[analysis.sectionId]);
+
   const staticExecutiveText = "This executive summary provides a high-level overview of the assessment results. Scores are color-coded for quick identification of strengths and areas for attention. Weighted averages reflect the relative importance of each area as defined in the questionnaire structure.";
 
   return (
@@ -601,7 +649,7 @@ export default function ReportDetailsPage() {
       <div ref={barChartExportRef} className="absolute -left-[9999px] top-auto w-[800px] p-4 bg-white text-black">
         <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Weighted Area Scores</h2>
         <div className="space-y-4 pt-2">
-            {sortedBarScores.map((area) => (
+            {sortedIncludedBarScores.map((area) => (
             <div key={area.sectionId} className="grid grid-cols-12 items-center gap-2 border-b pb-4 last:border-b-0 last:pb-0">
                 <p className="col-span-4 font-medium text-sm self-center whitespace-normal" title={area.sectionName}>
                     {area.sectionName}
@@ -627,7 +675,7 @@ export default function ReportDetailsPage() {
        {/* Hidden container for DOCX export of count analysis */}
       <div ref={countAnalysisExportRef} className="absolute -left-[9999px] top-auto w-[800px] p-4 bg-white text-black space-y-4">
         <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Response Count Analysis</h2>
-        {reportData.countAnalyses.map(analysis => (
+        {includedCountAnalyses.map(analysis => (
           <div key={analysis.sectionId} className="p-4 border border-slate-200 rounded-lg">
             <h3 className="text-lg font-semibold mb-2">{analysis.sectionName}</h3>
             <table className="w-full text-sm">
@@ -718,35 +766,54 @@ export default function ReportDetailsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Performance by Area</CardTitle>
-              <CardDescription>Average score for each weighted area, ordered high to low. Click 'Details' for a per-question breakdown.</CardDescription>
+              <CardDescription>Average score for each weighted area, ordered high to low. Use the switches to select sections for the Word export.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 pt-2">
-              {sortedBarScores.map((area) => (
-                <div key={area.sectionId} className="grid grid-cols-12 items-center gap-2 border-b pb-4 last:border-b-0 last:pb-0">
-                  <p className="col-span-12 sm:col-span-4 font-medium text-sm whitespace-normal" title={area.sectionName}>
-                    {area.sectionName}
-                  </p>
-                  <div className="col-span-12 sm:col-span-5">
-                    <div className="w-full bg-muted rounded-full h-3">
-                      <div
-                        className="h-3 rounded-full"
-                        style={{
-                          width: `${(area.averageScore / highestPossibleScore) * 100}%`,
-                          backgroundColor: getScoreFillColor(area.averageScore),
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-                  <p className={`col-span-6 sm:col-span-1 text-right font-bold ${getScoreTextColorClassName(area.averageScore)}`}>
-                    {area.averageScore.toFixed(2)}
-                  </p>
-                  <div className="col-span-6 sm:col-span-2 text-right">
-                    <Link href={`/admin/reports/${responseId}/${area.sectionId}`}>
-                        <Button variant="outline" size="sm">Details</Button>
-                    </Link>
-                  </div>
-                </div>
-              ))}
+            <CardContent className="pt-2">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="w-[40%]">Area</TableHead>
+                            <TableHead>Score</TableHead>
+                            <TableHead>Details</TableHead>
+                            <TableHead className="text-right">Include in Export</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {sortedBarScores.map((area) => (
+                            <TableRow key={area.sectionId}>
+                                <TableCell className="font-medium">{area.sectionName}</TableCell>
+                                <TableCell>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-24 bg-muted rounded-full h-3">
+                                            <div
+                                                className="h-3 rounded-full"
+                                                style={{
+                                                    width: `${(area.averageScore / highestPossibleScore) * 100}%`,
+                                                    backgroundColor: getScoreFillColor(area.averageScore),
+                                                }}
+                                            ></div>
+                                        </div>
+                                        <span className={`font-bold ${getScoreTextColorClassName(area.averageScore)}`}>
+                                            {area.averageScore.toFixed(2)}
+                                        </span>
+                                    </div>
+                                </TableCell>
+                                <TableCell>
+                                    <Link href={`/admin/reports/${responseId}/${area.sectionId}`}>
+                                        <Button variant="outline" size="sm">Details</Button>
+                                    </Link>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                     <Switch
+                                        checked={selectedSections[area.sectionId] ?? true}
+                                        onCheckedChange={(checked) => handleSectionSelectionChange(area.sectionId, checked)}
+                                        aria-label={`Toggle inclusion of ${area.sectionName} in export`}
+                                    />
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
             </CardContent>
           </Card>
         </section>
@@ -909,3 +976,6 @@ export default function ReportDetailsPage() {
     </div>
   );
 }
+
+
+    

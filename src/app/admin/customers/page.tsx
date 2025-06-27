@@ -29,6 +29,17 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -37,7 +48,7 @@ import {
 } from "@/components/ui/select"
 import { DatePicker } from '@/components/ui/date-picker'; 
 import { useToast } from '@/hooks/use-toast';
-import { UsersRound, PlusCircle, ClipboardList, LinkIcon, Trash2, CalendarDays, FileSignature, ExternalLink } from 'lucide-react';
+import { UsersRound, PlusCircle, ClipboardList, LinkIcon, Trash2, CalendarDays, FileSignature, ExternalLink, Edit } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import Link from 'next/link';
 import { addDays, format } from 'date-fns';
@@ -61,16 +72,23 @@ export default function AdminCustomersPage() {
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
-  const [isCreateCustomerOpen, setIsCreateCustomerOpen] = useState(false);
   
+  // Create customer state
+  const [isCreateCustomerOpen, setIsCreateCustomerOpen] = useState(false);
   const [newCustomer, setNewCustomer] = useState(initialCustomerState);
   const [returnDeadline, setReturnDeadline] = useState<Date | undefined>();
 
+  // Edit customer state
+  const [isEditCustomerOpen, setIsEditCustomerOpen] = useState(false);
+  const [customerToEdit, setCustomerToEdit] = useState<Customer | null>(null);
+
+  // Manage links state
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isManageLinksOpen, setIsManageLinksOpen] = useState(false);
   const [customerLinks, setCustomerLinks] = useState<CustomerLink[]>([]);
   const [isLoadingLinks, setIsLoadingLinks] = useState(false);
 
+  // Generate link state
   const [isGenerateLinkOpen, setIsGenerateLinkOpen] = useState(false);
   const [questionnaireVersions, setQuestionnaireVersions] = useState<QuestionnaireVersion[]>([]);
   const [selectedQuestionnaireId, setSelectedQuestionnaireId] = useState<string>('');
@@ -85,7 +103,7 @@ export default function AdminCustomersPage() {
         id: doc.id,
         ...doc.data(),
         createdAt: (doc.data().createdAt as Timestamp)?.toDate ? (doc.data().createdAt as Timestamp).toDate() : new Date(doc.data().createdAt),
-        returnDeadline: (doc.data().returnDeadline as Timestamp)?.toDate ? (doc.data().returnDeadline as Timestamp).toDate() : null,
+        returnDeadline: (doc.data().returnDeadline as Timestamp)?.toDate ? (doc.data().returnDeadline as Timestamp).toDate() : undefined,
       } as Customer));
       setCustomers(fetchedCustomers.sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime()));
     } catch (error) {
@@ -129,18 +147,10 @@ export default function AdminCustomersPage() {
     }
     try {
       const customerDoc: any = {
-        firstName: newCustomer.firstName,
-        email: newCustomer.email,
+        ...newCustomer,
         createdAt: serverTimestamp(),
+        returnDeadline: returnDeadline ? Timestamp.fromDate(returnDeadline) : null,
       };
-      if (newCustomer.lastName) customerDoc.lastName = newCustomer.lastName;
-      if (newCustomer.jobTitle) customerDoc.jobTitle = newCustomer.jobTitle;
-      if (newCustomer.sector) customerDoc.sector = newCustomer.sector;
-      if (newCustomer.numberOfEmployees) customerDoc.numberOfEmployees = newCustomer.numberOfEmployees;
-      if (newCustomer.turnover) customerDoc.turnover = newCustomer.turnover;
-      if (newCustomer.province) customerDoc.province = newCustomer.province;
-      if (newCustomer.need) customerDoc.need = newCustomer.need;
-      if (returnDeadline) customerDoc.returnDeadline = Timestamp.fromDate(returnDeadline);
 
       await addDoc(collection(db, 'customers'), customerDoc);
 
@@ -152,6 +162,65 @@ export default function AdminCustomersPage() {
     } catch (error) {
       console.error("Error creating customer:", error);
       toast({ variant: "destructive", title: "Creation Failed", description: "Could not create customer." });
+    }
+  };
+
+  const openEditDialog = (customer: Customer) => {
+    setCustomerToEdit(customer);
+    setIsEditCustomerOpen(true);
+  };
+
+  const handleEditInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (!customerToEdit) return;
+    const { id, value } = e.target;
+    setCustomerToEdit(prev => prev ? { ...prev, [id]: value } : null);
+  };
+
+  const handleEditDateChange = (date: Date | undefined) => {
+    if (!customerToEdit) return;
+    setCustomerToEdit(prev => prev ? { ...prev, returnDeadline: date } : null);
+  };
+
+  const handleUpdateCustomer = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!customerToEdit) return;
+    if (!customerToEdit.firstName.trim() || !customerToEdit.email.trim()) {
+      toast({ variant: "destructive", title: "Missing required fields", description: "Please enter First Name and Email." });
+      return;
+    }
+    try {
+      const customerRef = doc(db, 'customers', customerToEdit.id);
+      const { id, createdAt, ...updateData } = customerToEdit; // Exclude id and createdAt from update
+      
+      const dataToUpdate: any = {
+          ...updateData,
+          returnDeadline: customerToEdit.returnDeadline ? Timestamp.fromDate(new Date(customerToEdit.returnDeadline)) : null,
+      };
+
+      await updateDoc(customerRef, dataToUpdate);
+
+      toast({ title: "Customer Updated", description: `${customerToEdit.firstName} has been updated.` });
+      setIsEditCustomerOpen(false);
+      setCustomerToEdit(null);
+      fetchCustomers();
+    } catch (error) {
+      console.error("Error updating customer:", error);
+      toast({ variant: "destructive", title: "Update Failed", description: "Could not update customer." });
+    }
+  };
+
+  const handleDeleteCustomer = async (customerId: string) => {
+    try {
+      await deleteDoc(doc(db, "customers", customerId));
+      toast({ title: "Customer Deleted", description: "The customer record has been removed." });
+      fetchCustomers();
+    } catch (error) {
+      console.error("Error deleting customer: ", error);
+      toast({
+        variant: "destructive",
+        title: "Delete Failed",
+        description: "Could not delete the customer.",
+      });
     }
   };
 
@@ -334,10 +403,35 @@ export default function AdminCustomersPage() {
                     <TableCell>{customer.email}</TableCell>
                     <TableCell>{customer.sector || 'N/A'}</TableCell>
                     <TableCell>{customer.createdAt.toLocaleDateString()}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right space-x-1">
                       <Button variant="outline" size="sm" onClick={() => openManageLinksDialog(customer)}>
-                        <ClipboardList className="mr-2 h-4 w-4" /> Manage Links
+                        <ClipboardList className="mr-2 h-4 w-4" /> Links
                       </Button>
+                      <Button variant="outline" size="icon" onClick={() => openEditDialog(customer)} aria-label="Edit customer">
+                          <Edit className="h-4 w-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                           <Button variant="destructive" size="icon" aria-label="Delete customer">
+                              <Trash2 className="h-4 w-4" />
+                           </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                This action cannot be undone. This will permanently delete the customer record for {customer.firstName}.
+                                This will not delete any associated assessment links.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteCustomer(customer.id)}>
+                                Delete
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -346,6 +440,67 @@ export default function AdminCustomersPage() {
           )}
         </CardContent>
       </Card>
+      
+      {/* Edit Customer Dialog */}
+      {customerToEdit && (
+        <Dialog open={isEditCustomerOpen} onOpenChange={setIsEditCustomerOpen}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Edit Customer</DialogTitle>
+              <DialogDescription>Update the details for {customerToEdit.firstName}.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleUpdateCustomer}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+                <div>
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input id="firstName" value={customerToEdit.firstName} onChange={handleEditInputChange} required />
+                </div>
+                <div>
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input id="lastName" value={customerToEdit.lastName || ''} onChange={handleEditInputChange} />
+                </div>
+                <div className="md:col-span-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input id="email" type="email" value={customerToEdit.email} onChange={handleEditInputChange} required />
+                </div>
+                <div>
+                  <Label htmlFor="jobTitle">Job Title</Label>
+                  <Input id="jobTitle" value={customerToEdit.jobTitle || ''} onChange={handleEditInputChange} />
+                </div>
+                <div>
+                  <Label htmlFor="sector">Sector</Label>
+                  <Input id="sector" value={customerToEdit.sector || ''} onChange={handleEditInputChange} />
+                </div>
+                <div>
+                  <Label htmlFor="numberOfEmployees">Number of Employees</Label>
+                  <Input id="numberOfEmployees" value={customerToEdit.numberOfEmployees || ''} onChange={handleEditInputChange} />
+                </div>
+                <div>
+                  <Label htmlFor="turnover">Turnover</Label>
+                  <Input id="turnover" value={customerToEdit.turnover || ''} onChange={handleEditInputChange} />
+                </div>
+                <div>
+                  <Label htmlFor="province">Province</Label>
+                  <Input id="province" value={customerToEdit.province || ''} onChange={handleEditInputChange} />
+                </div>
+                <div>
+                  <Label htmlFor="returnDeadline">Return Deadline</Label>
+                  <DatePicker date={customerToEdit.returnDeadline} setDate={handleEditDateChange} className="w-full" />
+                </div>
+                <div className="md:col-span-2">
+                  <Label htmlFor="need">Need</Label>
+                  <Input id="need" value={customerToEdit.need || ''} onChange={handleEditInputChange} />
+                </div>
+              </div>
+              <DialogFooter>
+                <DialogClose asChild><Button type="button" variant="outline" onClick={() => setCustomerToEdit(null)}>Cancel</Button></DialogClose>
+                <Button type="submit">Save Changes</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
+
 
       {selectedCustomer && (
         <Dialog open={isManageLinksOpen} onOpenChange={(isOpen) => { setIsManageLinksOpen(isOpen); if (!isOpen) setSelectedCustomer(null); }}>
@@ -411,7 +566,7 @@ export default function AdminCustomersPage() {
                     {customerLinks.map(link => (
                       <TableRow key={link.id}>
                         <TableCell>{link.questionnaireVersionName || link.questionnaireVersionId}</TableCell>
-                        <TableCell><span className={`px-2 py-1 text-xs rounded-full ${link.status === 'completed' ? 'bg-green-100 text-green-700' : link.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>{link.status}</span></TableCell>
+                        <TableCell><span className={`px-2 py-1 text-xs rounded-full ${link.status === 'completed' ? 'bg-green-100 text-green-700' : link.status === 'pending' || link.status === 'started' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>{link.status}</span></TableCell>
                         <TableCell>{format(link.expiresAt, "PPP")}</TableCell>
                         <TableCell>
                           <Link href={`/assessment/${link.id}`} target="_blank" legacyBehavior>
@@ -440,3 +595,5 @@ export default function AdminCustomersPage() {
     </div>
   );
 }
+
+    

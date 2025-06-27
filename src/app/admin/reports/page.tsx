@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { db } from '@/lib/firebase/config';
 import { collection, getDocs, query, orderBy, Timestamp } from 'firebase/firestore';
-import type { CustomerResponse } from '@/lib/types';
+import type { CustomerResponse, CustomerLink } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -21,44 +21,73 @@ import { FileSearch, ArrowRight, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown 
 import { useToast } from "@/hooks/use-toast";
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 
-type SortKey = 'customerName' | 'questionnaireVersionName' | 'submittedAt';
+interface AssessmentListItem {
+  id: string;
+  customerName?: string;
+  questionnaireVersionName?: string;
+  submittedAt?: Date;
+  createdAt: Date;
+  status: "pending" | "started" | "completed" | "expired";
+}
+
+type SortKey = 'customerName' | 'questionnaireVersionName' | 'submittedAt' | 'status' | 'createdAt';
 
 export default function AdminReportsListPage() {
   useRequireAuth();
   const { toast } = useToast();
 
-  const [responses, setResponses] = useState<CustomerResponse[]>([]);
+  const [assessments, setAssessments] = useState<AssessmentListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' }>({ key: 'submittedAt', direction: 'descending' });
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' }>({ key: 'createdAt', direction: 'descending' });
 
   useEffect(() => {
-    const fetchCompletedResponses = async () => {
+    const fetchAssessments = async () => {
       setIsLoading(true);
       try {
-        const responsesQuery = query(
-          collection(db, 'customerResponses'),
-          orderBy('submittedAt', 'desc')
-        );
-        const querySnapshot = await getDocs(responsesQuery);
+        const linksQuery = query(collection(db, 'customerLinks'), orderBy('createdAt', 'desc'));
+        const responsesQuery = query(collection(db, 'customerResponses'));
+
+        const [linksSnapshot, responsesSnapshot] = await Promise.all([
+          getDocs(linksQuery),
+          getDocs(responsesQuery),
+        ]);
         
-        const fetchedResponses = querySnapshot.docs.map(docSnap => {
-          const data = docSnap.data();
+        const responsesMap = new Map<string, CustomerResponse>();
+        responsesSnapshot.docs.forEach(docSnap => {
+            const data = docSnap.data();
+            const response = {
+                id: docSnap.id,
+                ...data,
+                submittedAt: (data.submittedAt as Timestamp)?.toDate ? (data.submittedAt as Timestamp).toDate() : new Date(data.submittedAt),
+            } as CustomerResponse;
+            responsesMap.set(response.id, response);
+        });
+
+        const fetchedAssessments = linksSnapshot.docs.map(docSnap => {
+          const data = docSnap.data() as Omit<CustomerLink, 'id'>;
+          const linkId = docSnap.id;
+          const responseData = responsesMap.get(linkId);
+
           return {
-            id: docSnap.id,
-            ...data,
-            submittedAt: (data.submittedAt as Timestamp)?.toDate ? (data.submittedAt as Timestamp).toDate() : new Date(data.submittedAt),
-          } as CustomerResponse;
+            id: linkId,
+            customerName: data.customerName || 'N/A',
+            questionnaireVersionName: data.questionnaireVersionName || 'N/A',
+            status: data.status,
+            createdAt: (data.createdAt as Timestamp)?.toDate ? (data.createdAt as Timestamp).toDate() : new Date(data.createdAt),
+            submittedAt: responseData?.submittedAt,
+          };
         });
         
-        setResponses(fetchedResponses);
+        setAssessments(fetchedAssessments);
       } catch (error) {
-        console.error("Error fetching completed responses:", error);
-        toast({ variant: "destructive", title: "Error", description: "Could not fetch completed assessment responses." });
+        console.error("Error fetching assessments:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not fetch assessment list." });
       }
       setIsLoading(false);
     };
-    fetchCompletedResponses();
+    fetchAssessments();
   }, [toast]);
   
   const requestSort = (key: SortKey) => {
@@ -69,23 +98,28 @@ export default function AdminReportsListPage() {
     setSortConfig({ key, direction });
   };
 
-  const sortedResponses = useMemo(() => {
-    let sortableItems = [...responses];
+  const sortedAssessments = useMemo(() => {
+    let sortableItems = [...assessments];
     if (sortConfig.key) {
       sortableItems.sort((a, b) => {
         const key = sortConfig.key;
-        let aValue: any = a[key as keyof CustomerResponse];
-        let bValue: any = b[key as keyof CustomerResponse];
+        let aValue: any = a[key as keyof AssessmentListItem];
+        let bValue: any = b[key as keyof AssessmentListItem];
 
-        if (aValue === undefined || aValue === null || aValue === '') return 1;
-        if (bValue === undefined || bValue === null || bValue === '') return -1;
-        
-        if (key === 'submittedAt') {
-          return (aValue.getTime() - bValue.getTime()) * (sortConfig.direction === 'ascending' ? 1 : -1);
+        if (key === 'submittedAt' || key === 'createdAt') {
+          const dateA = aValue ? new Date(aValue).getTime() : 0;
+          const dateB = bValue ? new Date(bValue).getTime() : 0;
+          if (!dateA) return 1;
+          if (!dateB) return -1;
+          if (sortConfig.direction === 'ascending') {
+            return dateA - dateB;
+          } else {
+            return dateB - dateA;
+          }
         }
-
-        aValue = String(aValue).toLowerCase();
-        bValue = String(bValue).toLowerCase();
+        
+        aValue = String(aValue || '').toLowerCase();
+        bValue = String(bValue || '').toLowerCase();
 
         if (aValue < bValue) {
           return sortConfig.direction === 'ascending' ? -1 : 1;
@@ -97,7 +131,7 @@ export default function AdminReportsListPage() {
       });
     }
     return sortableItems;
-  }, [responses, sortConfig]);
+  }, [assessments, sortConfig]);
 
   const SortableHeader = ({ sortKey, children, className }: { sortKey: SortKey, children: React.ReactNode, className?: string }) => (
     <TableHead className={className}>
@@ -109,6 +143,21 @@ export default function AdminReportsListPage() {
       </Button>
     </TableHead>
   );
+
+  const getStatusBadge = (status: AssessmentListItem['status']) => {
+    switch (status) {
+      case 'completed':
+        return <Badge className="bg-green-100 text-green-700 hover:bg-green-200">Completed</Badge>;
+      case 'started':
+        return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-200">In Progress</Badge>;
+      case 'pending':
+        return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200">Pending</Badge>;
+      case 'expired':
+        return <Badge variant="secondary">Expired</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
 
   if (isLoading) {
     return (
@@ -124,7 +173,7 @@ export default function AdminReportsListPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+            {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
           </div>
         </CardContent>
       </Card>
@@ -137,19 +186,19 @@ export default function AdminReportsListPage() {
         <CardHeader>
           <div className="flex items-center gap-3 mb-2">
             <FileSearch className="w-8 h-8 text-primary" />
-            <CardTitle className="text-2xl font-headline">Assessment Reports</CardTitle>
+            <CardTitle className="text-2xl font-headline">Assessments</CardTitle>
           </div>
           <CardDescription>
-            Browse and view detailed reports for all completed assessments.
+            Browse all assessments. Reports are available for completed items.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {responses.length === 0 ? (
+          {assessments.length === 0 ? (
             <div className="py-10 text-center">
               <AlertTriangle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-xl font-semibold text-muted-foreground">No Completed Assessments</h3>
+              <h3 className="text-xl font-semibold text-muted-foreground">No Assessments Found</h3>
               <p className="text-muted-foreground mt-2">
-                There are no completed assessments to display reports for yet.
+                There are no assessments to display yet.
               </p>
             </div>
           ) : (
@@ -158,22 +207,32 @@ export default function AdminReportsListPage() {
                 <TableRow>
                   <SortableHeader sortKey="customerName">Customer Name</SortableHeader>
                   <SortableHeader sortKey="questionnaireVersionName">Questionnaire</SortableHeader>
+                  <SortableHeader sortKey="status">Status</SortableHeader>
                   <SortableHeader sortKey="submittedAt">Submitted At</SortableHeader>
+                  <SortableHeader sortKey="createdAt">Created At</SortableHeader>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedResponses.map((response) => (
-                  <TableRow key={response.id}>
-                    <TableCell className="font-medium">{response.customerName || 'N/A'}</TableCell>
-                    <TableCell>{response.questionnaireVersionName}</TableCell>
-                    <TableCell>{response.submittedAt ? format(response.submittedAt, 'PPP p') : 'N/A'}</TableCell>
+                {sortedAssessments.map((assessment) => (
+                  <TableRow key={assessment.id}>
+                    <TableCell className="font-medium">{assessment.customerName}</TableCell>
+                    <TableCell>{assessment.questionnaireVersionName}</TableCell>
+                    <TableCell>{getStatusBadge(assessment.status)}</TableCell>
+                    <TableCell>{assessment.submittedAt ? format(assessment.submittedAt, 'PPP p') : 'N/A'}</TableCell>
+                    <TableCell>{assessment.createdAt ? format(assessment.createdAt, 'PPP p') : 'N/A'}</TableCell>
                     <TableCell className="text-right">
-                      <Link href={`/admin/reports/${response.id}`} passHref>
-                        <Button variant="outline" size="sm">
+                      {assessment.status === 'completed' ? (
+                        <Link href={`/admin/reports/${assessment.id}`} passHref>
+                          <Button variant="outline" size="sm">
+                            View Report <ArrowRight className="ml-2 h-4 w-4" />
+                          </Button>
+                        </Link>
+                      ) : (
+                        <Button variant="outline" size="sm" disabled>
                           View Report <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
-                      </Link>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

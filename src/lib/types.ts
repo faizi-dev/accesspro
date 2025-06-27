@@ -57,10 +57,19 @@ export interface QuestionnaireUploadData {
 
 export interface Customer {
   id: string;
-  name: string;
+  firstName: string;
+  lastName?: string;
   email: string;
+  jobTitle?: string;
+  sector?: string;
+  numberOfEmployees?: string;
+  turnover?: string;
+  province?: string;
+  need?: string;
+  returnDeadline?: Date | null;
   createdAt: Date;
 }
+
 
 export interface CustomerLink {
   id: string;

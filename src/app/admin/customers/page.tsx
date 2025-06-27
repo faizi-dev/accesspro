@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { db } from '@/lib/firebase/config';
 import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
@@ -43,6 +43,18 @@ import Link from 'next/link';
 import { addDays, format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
+const initialCustomerState = {
+  firstName: '',
+  lastName: '',
+  email: '',
+  jobTitle: '',
+  sector: '',
+  numberOfEmployees: '',
+  turnover: '',
+  province: '',
+  need: '',
+};
+
 export default function AdminCustomersPage() {
   useRequireAuth();
   const { toast } = useToast();
@@ -50,8 +62,9 @@ export default function AdminCustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
   const [isCreateCustomerOpen, setIsCreateCustomerOpen] = useState(false);
-  const [newCustomerName, setNewCustomerName] = useState('');
-  const [newCustomerEmail, setNewCustomerEmail] = useState('');
+  
+  const [newCustomer, setNewCustomer] = useState(initialCustomerState);
+  const [returnDeadline, setReturnDeadline] = useState<Date | undefined>();
 
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isManageLinksOpen, setIsManageLinksOpen] = useState(false);
@@ -72,6 +85,7 @@ export default function AdminCustomersPage() {
         id: doc.id,
         ...doc.data(),
         createdAt: (doc.data().createdAt as Timestamp)?.toDate ? (doc.data().createdAt as Timestamp).toDate() : new Date(doc.data().createdAt),
+        returnDeadline: (doc.data().returnDeadline as Timestamp)?.toDate ? (doc.data().returnDeadline as Timestamp).toDate() : null,
       } as Customer));
       setCustomers(fetchedCustomers.sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime()));
     } catch (error) {
@@ -102,21 +116,37 @@ export default function AdminCustomersPage() {
     fetchQuestionnaireVersions();
   }, []);
 
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    setNewCustomer(prev => ({ ...prev, [id]: value }));
+  };
+
   const handleCreateCustomer = async (e: FormEvent) => {
     e.preventDefault();
-    if (!newCustomerName.trim() || !newCustomerEmail.trim()) {
-      toast({ variant: "destructive", title: "Missing fields", description: "Please enter name and email." });
+    if (!newCustomer.firstName.trim() || !newCustomer.email.trim()) {
+      toast({ variant: "destructive", title: "Missing required fields", description: "Please enter First Name and Email." });
       return;
     }
     try {
-      await addDoc(collection(db, 'customers'), {
-        name: newCustomerName,
-        email: newCustomerEmail,
+      const customerDoc: any = {
+        firstName: newCustomer.firstName,
+        email: newCustomer.email,
         createdAt: serverTimestamp(),
-      });
-      toast({ title: "Customer Created", description: `${newCustomerName} has been added.` });
-      setNewCustomerName('');
-      setNewCustomerEmail('');
+      };
+      if (newCustomer.lastName) customerDoc.lastName = newCustomer.lastName;
+      if (newCustomer.jobTitle) customerDoc.jobTitle = newCustomer.jobTitle;
+      if (newCustomer.sector) customerDoc.sector = newCustomer.sector;
+      if (newCustomer.numberOfEmployees) customerDoc.numberOfEmployees = newCustomer.numberOfEmployees;
+      if (newCustomer.turnover) customerDoc.turnover = newCustomer.turnover;
+      if (newCustomer.province) customerDoc.province = newCustomer.province;
+      if (newCustomer.need) customerDoc.need = newCustomer.need;
+      if (returnDeadline) customerDoc.returnDeadline = Timestamp.fromDate(returnDeadline);
+
+      await addDoc(collection(db, 'customers'), customerDoc);
+
+      toast({ title: "Customer Created", description: `${newCustomer.firstName} has been added.` });
+      setNewCustomer(initialCustomerState);
+      setReturnDeadline(undefined);
       setIsCreateCustomerOpen(false);
       fetchCustomers();
     } catch (error) {
@@ -170,7 +200,7 @@ export default function AdminCustomersPage() {
       const linkId = uuidv4();
       await setDoc(doc(db, 'customerLinks', linkId), {
         customerId: selectedCustomer.id,
-        customerName: selectedCustomer.name,
+        customerName: `${selectedCustomer.firstName} ${selectedCustomer.lastName || ''}`.trim(),
         customerEmail: selectedCustomer.email,
         questionnaireVersionId: selectedQuestionnaireId,
         questionnaireVersionName: version.name,
@@ -178,7 +208,7 @@ export default function AdminCustomersPage() {
         expiresAt: Timestamp.fromDate(linkExpiresAt),
         status: "pending",
       });
-      toast({ title: "Link Generated", description: `New assessment link created for ${selectedCustomer.name}.` });
+      toast({ title: "Link Generated", description: `New assessment link created for ${selectedCustomer.firstName}.` });
       setIsGenerateLinkOpen(false);
       setSelectedQuestionnaireId('');
       setLinkExpiresAt(addDays(new Date(), 7));
@@ -223,19 +253,53 @@ export default function AdminCustomersPage() {
                 <PlusCircle className="mr-2 h-4 w-4" /> Create Customer
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Create New Customer</DialogTitle>
-                <DialogDescription>Enter the details for the new customer.</DialogDescription>
+                <DialogDescription>Enter the details for the new customer. First Name and Email are required.</DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleCreateCustomer} className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="customerName" className="text-right">Name</Label>
-                  <Input id="customerName" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} className="col-span-3" required />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="customerEmail" className="text-right">Email</Label>
-                  <Input id="customerEmail" type="email" value={newCustomerEmail} onChange={(e) => setNewCustomerEmail(e.target.value)} className="col-span-3" required />
+              <form onSubmit={handleCreateCustomer}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+                  <div>
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input id="firstName" value={newCustomer.firstName} onChange={handleInputChange} required />
+                  </div>
+                  <div>
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input id="lastName" value={newCustomer.lastName} onChange={handleInputChange} />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" type="email" value={newCustomer.email} onChange={handleInputChange} required />
+                  </div>
+                  <div>
+                    <Label htmlFor="jobTitle">Job Title</Label>
+                    <Input id="jobTitle" value={newCustomer.jobTitle} onChange={handleInputChange} />
+                  </div>
+                  <div>
+                    <Label htmlFor="sector">Sector</Label>
+                    <Input id="sector" value={newCustomer.sector} onChange={handleInputChange} />
+                  </div>
+                   <div>
+                    <Label htmlFor="numberOfEmployees">Number of Employees</Label>
+                    <Input id="numberOfEmployees" value={newCustomer.numberOfEmployees} onChange={handleInputChange} />
+                  </div>
+                  <div>
+                    <Label htmlFor="turnover">Turnover</Label>
+                    <Input id="turnover" value={newCustomer.turnover} onChange={handleInputChange} />
+                  </div>
+                  <div>
+                    <Label htmlFor="province">Province</Label>
+                    <Input id="province" value={newCustomer.province} onChange={handleInputChange} />
+                  </div>
+                   <div>
+                    <Label htmlFor="returnDeadline">Return Deadline</Label>
+                    <DatePicker date={returnDeadline} setDate={setReturnDeadline} className="w-full" />
+                  </div>
+                   <div className="md:col-span-2">
+                    <Label htmlFor="need">Need</Label>
+                    <Input id="need" value={newCustomer.need} onChange={handleInputChange} />
+                  </div>
                 </div>
                 <DialogFooter>
                   <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
@@ -256,8 +320,9 @@ export default function AdminCustomersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
+                  <TableHead>Full Name</TableHead>
                   <TableHead>Email</TableHead>
+                  <TableHead>Sector</TableHead>
                   <TableHead>Created At</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -265,8 +330,9 @@ export default function AdminCustomersPage() {
               <TableBody>
                 {customers.map((customer) => (
                   <TableRow key={customer.id}>
-                    <TableCell className="font-medium">{customer.name}</TableCell>
+                    <TableCell className="font-medium">{`${customer.firstName} ${customer.lastName || ''}`.trim()}</TableCell>
                     <TableCell>{customer.email}</TableCell>
+                    <TableCell>{customer.sector || 'N/A'}</TableCell>
                     <TableCell>{customer.createdAt.toLocaleDateString()}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="outline" size="sm" onClick={() => openManageLinksDialog(customer)}>
@@ -285,7 +351,7 @@ export default function AdminCustomersPage() {
         <Dialog open={isManageLinksOpen} onOpenChange={(isOpen) => { setIsManageLinksOpen(isOpen); if (!isOpen) setSelectedCustomer(null); }}>
           <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Manage Links for {selectedCustomer.name}</DialogTitle>
+              <DialogTitle>Manage Links for {`${selectedCustomer.firstName} ${selectedCustomer.lastName || ''}`.trim()}</DialogTitle>
               <DialogDescription>View, generate, or revoke assessment links for this customer.</DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-4">

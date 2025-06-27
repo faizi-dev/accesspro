@@ -6,7 +6,7 @@ import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { FileText, Users, BarChart3, UploadCloud, Settings, ArrowRight } from 'lucide-react';
+import { FileText, Users, BarChart3, UploadCloud, Settings, ArrowRight, Activity } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase/config';
 import { collection, getDocs, query, where } from 'firebase/firestore';
@@ -21,6 +21,7 @@ export default function AdminDashboardPage() {
     activeQuestionnaires: 0,
     customers: 0,
     completedAssessments: 0,
+    inProgressAssessments: 0,
   });
   const [isStatsLoading, setIsStatsLoading] = useState(true);
 
@@ -30,18 +31,26 @@ export default function AdminDashboardPage() {
       try {
         const activeQuestionnairesQuery = query(collection(db, 'questionnaireVersions'), where("isActive", "==", true));
         const customersQuery = query(collection(db, 'customers'));
-        const responsesQuery = query(collection(db, 'customerResponses'));
+        const completedLinksQuery = query(collection(db, 'customerLinks'), where("status", "==", "completed"));
+        const inProgressLinksQuery = query(collection(db, 'customerLinks'), where("status", "in", ["pending", "started"]));
         
-        const [activeQuestionnairesSnapshot, customersSnapshot, responsesSnapshot] = await Promise.all([
+        const [
+          activeQuestionnairesSnapshot,
+          customersSnapshot,
+          completedLinksSnapshot,
+          inProgressLinksSnapshot
+        ] = await Promise.all([
             getDocs(activeQuestionnairesQuery),
             getDocs(customersQuery),
-            getDocs(responsesQuery)
+            getDocs(completedLinksQuery),
+            getDocs(inProgressLinksQuery)
         ]);
 
         setStats({
           activeQuestionnaires: activeQuestionnairesSnapshot.size,
           customers: customersSnapshot.size,
-          completedAssessments: responsesSnapshot.size,
+          completedAssessments: completedLinksSnapshot.size,
+          inProgressAssessments: inProgressLinksSnapshot.size,
         });
 
       } catch (error) {
@@ -114,11 +123,12 @@ export default function AdminDashboardPage() {
       <Card className="shadow-lg">
         <CardHeader>
             <CardTitle className="text-2xl font-headline">Platform Statistics</CardTitle>
-            <CardDescription>A summary of key metrics.</CardDescription>
+            <CardDescription>A summary of key metrics. Click a card to navigate.</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
            {isStatsLoading ? (
               <>
+                <Skeleton className="h-24 w-full" />
                 <Skeleton className="h-24 w-full" />
                 <Skeleton className="h-24 w-full" />
                 <Skeleton className="h-24 w-full" />
@@ -129,14 +139,18 @@ export default function AdminDashboardPage() {
                     <p className="text-3xl font-bold text-primary">{stats.activeQuestionnaires}</p>
                     <p className="text-sm text-muted-foreground">Active Questionnaires</p>
                 </div>
-                <div className="p-4 bg-secondary/30 rounded-lg text-center">
+                 <Link href="/admin/customers" className="block p-4 bg-secondary/30 rounded-lg text-center hover:bg-secondary/50 transition-colors">
                     <p className="text-3xl font-bold text-primary">{stats.customers}</p>
                     <p className="text-sm text-muted-foreground">Customers Managed</p>
-                </div>
-                <div className="p-4 bg-secondary/30 rounded-lg text-center">
+                </Link>
+                 <Link href="/admin/reports" className="block p-4 bg-secondary/30 rounded-lg text-center hover:bg-secondary/50 transition-colors">
                     <p className="text-3xl font-bold text-primary">{stats.completedAssessments}</p>
                     <p className="text-sm text-muted-foreground">Completed Assessments</p>
-                </div>
+                </Link>
+                <Link href="/admin/reports" className="block p-4 bg-secondary/30 rounded-lg text-center hover:bg-secondary/50 transition-colors">
+                    <p className="text-3xl font-bold text-primary">{stats.inProgressAssessments}</p>
+                    <p className="text-sm text-muted-foreground">Pending / In Progress</p>
+                </Link>
               </>
            )}
         </CardContent>

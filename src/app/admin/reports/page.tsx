@@ -29,10 +29,11 @@ interface AssessmentListItem {
   questionnaireVersionName?: string;
   submittedAt?: Date;
   createdAt: Date;
+  expiresAt: Date;
   status: "pending" | "started" | "completed" | "expired";
 }
 
-type SortKey = 'customerName' | 'questionnaireVersionName' | 'submittedAt' | 'status' | 'createdAt';
+type SortKey = 'customerName' | 'questionnaireVersionName' | 'submittedAt' | 'status' | 'createdAt' | 'expiresAt';
 
 export default function AdminReportsListPage() {
   useRequireAuth();
@@ -76,6 +77,7 @@ export default function AdminReportsListPage() {
             questionnaireVersionName: data.questionnaireVersionName || 'N/A',
             status: data.status,
             createdAt: (data.createdAt as Timestamp)?.toDate ? (data.createdAt as Timestamp).toDate() : new Date(data.createdAt),
+            expiresAt: (data.expiresAt as Timestamp)?.toDate ? (data.expiresAt as Timestamp).toDate() : new Date(data.expiresAt),
             submittedAt: responseData?.submittedAt,
           };
         });
@@ -106,7 +108,7 @@ export default function AdminReportsListPage() {
         let aValue: any = a[key as keyof AssessmentListItem];
         let bValue: any = b[key as keyof AssessmentListItem];
 
-        if (key === 'submittedAt' || key === 'createdAt') {
+        if (key === 'submittedAt' || key === 'createdAt' || key === 'expiresAt') {
           const dateA = aValue ? new Date(aValue).getTime() : 0;
           const dateB = bValue ? new Date(bValue).getTime() : 0;
           if (!dateA) return 1;
@@ -208,6 +210,7 @@ export default function AdminReportsListPage() {
                   <SortableHeader sortKey="customerName">Customer Name</SortableHeader>
                   <SortableHeader sortKey="questionnaireVersionName">Questionnaire</SortableHeader>
                   <SortableHeader sortKey="status">Status</SortableHeader>
+                  <SortableHeader sortKey="expiresAt">Expires At</SortableHeader>
                   <SortableHeader sortKey="submittedAt">Submitted At</SortableHeader>
                   <SortableHeader sortKey="createdAt">Created At</SortableHeader>
                   <TableHead className="text-right">Actions</TableHead>
@@ -219,6 +222,7 @@ export default function AdminReportsListPage() {
                     <TableCell className="font-medium">{assessment.customerName}</TableCell>
                     <TableCell>{assessment.questionnaireVersionName}</TableCell>
                     <TableCell>{getStatusBadge(assessment.status)}</TableCell>
+                    <TableCell>{assessment.expiresAt ? format(assessment.expiresAt, 'PPP') : 'N/A'}</TableCell>
                     <TableCell>{assessment.submittedAt ? format(assessment.submittedAt, 'PPP p') : 'N/A'}</TableCell>
                     <TableCell>{assessment.createdAt ? format(assessment.createdAt, 'PPP p') : 'N/A'}</TableCell>
                     <TableCell className="text-right">

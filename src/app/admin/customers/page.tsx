@@ -94,7 +94,7 @@ export default function AdminCustomersPage() {
   const [isGenerateLinkOpen, setIsGenerateLinkOpen] = useState(false);
   const [questionnaireVersions, setQuestionnaireVersions] = useState<QuestionnaireVersion[]>([]);
   const [selectedQuestionnaireId, setSelectedQuestionnaireId] = useState<string>('');
-  const [linkExpiresAt, setLinkExpiresAt] = useState<Date | undefined>(addDays(new Date(), 7));
+  const [linkExpiresAt, setLinkExpiresAt] = useState<Date | undefined>(addDays(new Date(), 14));
   
   // Sorting state
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' }>({ key: 'createdAt', direction: 'descending' });
@@ -285,7 +285,7 @@ export default function AdminCustomersPage() {
       toast({ title: "Link Generated", description: `New assessment link created for ${selectedCustomer.firstName}.` });
       setIsGenerateLinkOpen(false);
       setSelectedQuestionnaireId('');
-      setLinkExpiresAt(addDays(new Date(), 7));
+      setLinkExpiresAt(addDays(new Date(), 14));
       if (selectedCustomer) fetchCustomerLinks(selectedCustomer.id);
     } catch (error) {
       console.error("Error generating link:", error);
@@ -671,5 +671,7 @@ export default function AdminCustomersPage() {
     </div>
   );
 }
+
+    
 
     

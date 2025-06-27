@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, type FormEvent, type ChangeEvent } from 'react';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { db } from '@/lib/firebase/config';
-import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp, doc, setDoc, deleteDoc, updateDoc, getDoc } from 'firebase/firestore';
 import type { Customer, CustomerLink, QuestionnaireVersion, EmailTemplate } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -733,8 +733,3 @@ export default function AdminCustomersPage() {
     </div>
   );
 }
-
-    
-
-    
-

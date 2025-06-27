@@ -462,19 +462,70 @@ export default function ReportDetailsPage() {
                 }));
                 docSections.push(new Paragraph({
                     children: [new TextRun({ text: `Answer: `, italics: true }), new TextRun({ text: selectedOption?.text ?? "Not answered" })],
-                    spacing: { after: 60 }
+                    spacing: { after: 120 }
                 }));
                 
-                docSections.push(new Paragraph({
-                    children: [
-                        new TextRun({ text: "Score: " }),
-                        new TextRun({
-                            text: score.toFixed(2),
-                            bold: true,
-                            color: getScoreHexColor(score)
-                        })
-                    ]
-                }));
+                // Create bar graphic for score
+                const questionHighestScore = getHighestPossibleOptionScore([question]);
+                const scorePercentage = questionHighestScore > 0 ? (score / questionHighestScore) : 0;
+                const barColor = getScoreHexColor(score);
+                const totalBarWidth = 7000; // In DXA (twentieths of a point)
+                const filledWidth = Math.round(totalBarWidth * scorePercentage);
+                const unfilledWidth = totalBarWidth - filledWidth;
+                
+                const barGraphic = new DocxTable({
+                    width: { size: totalBarWidth, type: WidthType.DXA },
+                    rows: [
+                        new DocxTableRow({
+                            height: { value: 200, rule: 'atLeast' },
+                            children: [
+                                new DocxTableCell({
+                                    width: { size: filledWidth, type: WidthType.DXA },
+                                    shading: { type: ShadingType.CLEAR, fill: barColor },
+                                    children: [new Paragraph('')],
+                                    borders: { top: {style: 'nil'}, bottom: {style: 'nil'}, left: {style: 'nil'}, right: {style: 'nil'} }
+                                }),
+                                new DocxTableCell({
+                                    width: { size: unfilledWidth, type: WidthType.DXA },
+                                    shading: { type: ShadingType.CLEAR, fill: 'E5E7EB' }, // a light grey
+                                    children: [new Paragraph('')],
+                                    borders: { top: {style: 'nil'}, bottom: {style: 'nil'}, left: {style: 'nil'}, right: {style: 'nil'} }
+                                }),
+                            ],
+                        }),
+                    ],
+                    borders: {
+                        top: { style: "single", size: 2, color: "auto" },
+                        bottom: { style: "single", size: 2, color: "auto" },
+                        left: { style: "single", size: 2, color: "auto" },
+                        right: { style: "single", size: 2, color: "auto" },
+                    },
+                });
+
+                const layoutTable = new DocxTable({
+                    width: { size: '100%', type: WidthType.PERCENTAGE },
+                    columnWidths: [totalBarWidth + 100, 1500],
+                    rows: [
+                        new DocxTableRow({
+                            children: [
+                                new DocxTableCell({
+                                    children: [barGraphic],
+                                    borders: { top: {style: 'nil'}, bottom: {style: 'nil'}, left: {style: 'nil'}, right: {style: 'nil'} }
+                                }),
+                                new DocxTableCell({
+                                    children: [new Paragraph({
+                                        children: [new TextRun({ text: score.toFixed(2), bold: true, color: barColor })],
+                                        alignment: AlignmentType.RIGHT,
+                                    })],
+                                    verticalAlign: 'center',
+                                    borders: { top: {style: 'nil'}, bottom: {style: 'nil'}, left: {style: 'nil'}, right: {style: 'nil'} }
+                                }),
+                            ],
+                        }),
+                    ],
+                });
+
+                docSections.push(layoutTable);
                 
                 docSections.push(new Paragraph({
                     text: "",

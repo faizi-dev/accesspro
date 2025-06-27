@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/select"
 import { DatePicker } from '@/components/ui/date-picker'; 
 import { useToast } from '@/hooks/use-toast';
-import { UsersRound, PlusCircle, ClipboardList, LinkIcon, Trash2, CalendarDays, FileSignature, ExternalLink, Edit, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { UsersRound, PlusCircle, ClipboardList, LinkIcon, Trash2, CalendarDays, FileSignature, ExternalLink, Edit, ArrowUpDown, ArrowUp, ArrowDown, Loader2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import Link from 'next/link';
 import { addDays, format } from 'date-fns';
@@ -95,6 +95,7 @@ export default function AdminCustomersPage() {
   const [questionnaireVersions, setQuestionnaireVersions] = useState<QuestionnaireVersion[]>([]);
   const [selectedQuestionnaireId, setSelectedQuestionnaireId] = useState<string>('');
   const [linkExpiresAt, setLinkExpiresAt] = useState<Date | undefined>(addDays(new Date(), 14));
+  const [isGeneratingLink, setIsGeneratingLink] = useState(false);
   
   // Sorting state
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' }>({ key: 'createdAt', direction: 'descending' });
@@ -270,6 +271,7 @@ export default function AdminCustomersPage() {
       return;
     }
 
+    setIsGeneratingLink(true);
     try {
       const linkId = uuidv4();
       await setDoc(doc(db, 'customerLinks', linkId), {
@@ -290,6 +292,8 @@ export default function AdminCustomersPage() {
     } catch (error) {
       console.error("Error generating link:", error);
       toast({ variant: "destructive", title: "Link Generation Failed", description: "Could not generate assessment link." });
+    } finally {
+      setIsGeneratingLink(false);
     }
   };
 
@@ -600,7 +604,7 @@ export default function AdminCustomersPage() {
                   <form onSubmit={handleGenerateLink} className="space-y-4 pt-4">
                     <div>
                       <Label htmlFor="questionnaireVersion">Questionnaire Version</Label>
-                       <Select value={selectedQuestionnaireId} onValueChange={setSelectedQuestionnaireId}>
+                       <Select value={selectedQuestionnaireId} onValueChange={setSelectedQuestionnaireId} disabled={isGeneratingLink}>
                         <SelectTrigger id="questionnaireVersion">
                           <SelectValue placeholder="Select a version" />
                         </SelectTrigger>
@@ -613,11 +617,18 @@ export default function AdminCustomersPage() {
                     </div>
                     <div>
                       <Label htmlFor="expiresAt">Expires At</Label>
-                      <DatePicker date={linkExpiresAt} setDate={setLinkExpiresAt} className="w-full" />
+                      <DatePicker date={linkExpiresAt} setDate={setLinkExpiresAt} className="w-full" disabled={isGeneratingLink}/>
                     </div>
                     <DialogFooter>
-                      <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-                      <Button type="submit">Generate Link</Button>
+                      <DialogClose asChild><Button type="button" variant="outline" disabled={isGeneratingLink}>Cancel</Button></DialogClose>
+                      <Button type="submit" disabled={isGeneratingLink}>
+                        {isGeneratingLink ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Generating...
+                            </>
+                        ) : "Generate Link"}
+                      </Button>
                     </DialogFooter>
                   </form>
                 </DialogContent>

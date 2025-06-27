@@ -171,10 +171,6 @@ export default function ManageQuestionnairesPage() {
                       <Eye className="h-4 w-4" />
                     </Button>
                   </Link>
-                  {/* Edit might be complex, for now it's a placeholder */}
-                  <Button variant="outline" size="icon" disabled aria-label="Edit">
-                    <Edit3 className="h-4 w-4" />
-                  </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="destructive" size="icon" aria-label="Delete">

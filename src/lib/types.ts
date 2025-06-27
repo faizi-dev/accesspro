@@ -9,6 +9,7 @@ export interface Question {
   id:string;
   question: string;
   options: AnswerOption[];
+  additional_text?: string | null;
 }
 
 export interface Section {

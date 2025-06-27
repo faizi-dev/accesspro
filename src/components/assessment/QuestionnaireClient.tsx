@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, Save, Send, ChevronLeft, ChevronRight, Info } from 'lucide-react';
+import { AlertCircle, CheckCircle, Save, Send, ChevronLeft, ChevronRight, Info, ChevronUp, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import {
@@ -48,6 +48,7 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
   const [answers, setAnswers] = useState<Record<string, string>>(customerLink.responsesInProgress || {});
   const [isLoading, setIsLoading] = useState(false);
   const [shuffledOptionsCache, setShuffledOptionsCache] = useState<Record<string, AnswerOption[]>>({});
+  const [openAdditionalText, setOpenAdditionalText] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
   const router = useRouter();
 
@@ -74,6 +75,9 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentSectionIndex]);
 
+  const toggleAdditionalText = (questionId: string) => {
+    setOpenAdditionalText(prev => ({...prev, [questionId]: !prev[questionId]}));
+  }
 
   const handleAnswerChange = (questionId: string, optionId: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: optionId }));
@@ -198,10 +202,28 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
                 const shuffledQOptions = shuffledOptionsCache[question.id] || question.options;
                 return (
                   <div key={question.id} className="py-4 border-b last:border-b-0">
-                    <p className="font-medium mb-3 text-foreground/90">
+                    <p className="font-medium mb-2 text-foreground/90">
                       {qIndex + 1}. {question.question}
                       {!answers[question.id] && <span className="text-destructive ml-1">*</span>}
                     </p>
+
+                    {question.additional_text && (
+                      <div className="mb-4">
+                        <Button variant="link" size="sm" onClick={() => toggleAdditionalText(question.id)} className="p-0 h-auto text-primary text-sm flex items-center gap-1">
+                          {openAdditionalText[question.id] ? 'Hide explanation' : 'Need help answering?'}
+                          {openAdditionalText[question.id] 
+                              ? <ChevronUp className="h-4 w-4"/> 
+                              : <ChevronDown className="h-4 w-4"/>
+                          }
+                        </Button>
+                        {openAdditionalText[question.id] && (
+                          <div className="mt-2 text-sm text-muted-foreground p-3 bg-secondary/20 border-l-2 border-primary rounded-r-md animate-accordion-down">
+                              <p className="whitespace-pre-wrap">{question.additional_text}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <RadioGroup
                       value={answers[question.id]}
                       onValueChange={(value) => handleAnswerChange(question.id, value)}

@@ -136,6 +136,12 @@ export default function PreviewQuestionnairePage() {
                         <CardTitle className="text-base font-medium">
                           Q{questionIndex + 1}: {question.question}
                         </CardTitle>
+                        {question.additional_text && (
+                          <div className="text-xs text-muted-foreground pt-2 mt-2 border-t">
+                              <strong className="text-foreground/80">Help Text:</strong>
+                              <p className="italic pt-1 whitespace-pre-wrap">{question.additional_text}</p>
+                          </div>
+                        )}
                       </CardHeader>
                       <CardContent>
                         <ul className="space-y-2">

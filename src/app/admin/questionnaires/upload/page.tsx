@@ -131,6 +131,7 @@ export default function UploadQuestionnairePage() {
             return {
               id: questionId,
               question: questionUpload.question,
+              additional_text: questionUpload.additional_text || null,
               options: questionUpload.options.map((optionUpload, oIdx) => {
                  if (!optionUpload.text || typeof optionUpload.text !== 'string') {
                   throw new Error(`An option is missing its "text" ${sectionNameForError}, ${questionNameForError}.`);
@@ -196,6 +197,7 @@ export default function UploadQuestionnairePage() {
       "questions": [
         {
           "question": "How do you rate competency A?",
+          "additional_text": "This text provides more context for rating competency A. Consider the last quarter's performance against the documented goals.",
           "options": [
             { "text": "Needs Improvement", "score": 1 },
             { "text": "Meets Expectations", "score": 2 },

@@ -19,6 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { 
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Label as RechartsLabel,
 } from 'recharts';
@@ -1006,3 +1007,4 @@ export default function ReportDetailsPage() {
 
 
     
+

@@ -526,8 +526,7 @@ const sidebarMenuButtonVariants = cva(
 )
 
 export interface SidebarMenuButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    React.AnchorHTMLAttributes<HTMLAnchorElement> {
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   asChild?: boolean
   isActive?: boolean
   tooltip?: string | React.ComponentProps<typeof TooltipContent>
@@ -536,7 +535,7 @@ export interface SidebarMenuButtonProps
 }
 
 const SidebarMenuButton = React.forwardRef<
-  HTMLButtonElement | HTMLAnchorElement,
+  HTMLButtonElement,
   SidebarMenuButtonProps
 >(
   (
@@ -547,25 +546,22 @@ const SidebarMenuButton = React.forwardRef<
       tooltip,
       className,
       children,
-      href,
-      ...rest
+      asChild = false,
+      ...props
     },
     ref
   ) => {
     const { isMobile, state } = useSidebar()
-    const { asChild, ...domProps } = rest
-
-    const Comp = href ? "a" : asChild ? Slot : "button"
+    const Comp = asChild ? Slot : "button"
 
     const buttonElement = (
       <Comp
-        ref={ref as any}
-        href={href}
+        ref={ref}
         data-sidebar="menu-button"
         data-size={size}
         data-active={isActive}
         className={cn(sidebarMenuButtonVariants({ variant, size, className }))}
-        {...domProps}
+        {...props}
       >
         {children}
       </Comp>

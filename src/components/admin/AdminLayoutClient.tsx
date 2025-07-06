@@ -1,8 +1,9 @@
+
 "use client";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { useEffect } from "react";
 import {
   SidebarProvider,
   Sidebar,
@@ -14,6 +15,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarInset,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -31,9 +33,11 @@ import {
   ShieldCheck,
   Home,
   Mail,
+  PanelLeft,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { AdminUser } from "@/lib/types";
 
 const navItems = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -48,10 +52,116 @@ const navItems = [
   { href: "/admin/settings", label: "Email Settings", icon: Mail },
 ];
 
+function AdminLayoutInner({ children, user, handleLogout }: { children: React.ReactNode, user: AdminUser | null, handleLogout: () => void }) {
+  const pathname = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  useEffect(() => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  }, [pathname, isMobile, setOpenMobile]);
+
+  return (
+    <>
+      <Sidebar collapsible="icon" variant="sidebar" className="border-r">
+        <SidebarHeader className="p-4 items-center">
+            <Link href="/admin/dashboard" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
+                <ShieldCheck className="w-8 h-8 text-primary" />
+                <h1 className="text-2xl font-headline font-semibold text-primary group-data-[collapsible=icon]:hidden">AssessPro</h1>
+            </Link>
+          <div className="ml-auto group-data-[collapsible=icon]:hidden">
+            <SidebarTrigger />
+          </div>
+        </SidebarHeader>
+
+        <SidebarContent asChild>
+          <ScrollArea className="h-full">
+            <SidebarMenu className="px-2">
+              {navItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <Link href={item.href} passHref legacyBehavior>
+                    <SidebarMenuButton
+                      asChild={false}
+                      isActive={pathname === item.href || (item.subItems && pathname.startsWith(item.href)) || (item.href === "/admin/settings" && pathname.startsWith("/admin/settings"))}
+                      tooltip={item.label}
+                      className="justify-start"
+                    >
+                      <item.icon className="w-5 h-5" />
+                      <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                    </SidebarMenuButton>
+                  </Link>
+                  {item.subItems && (pathname.startsWith(item.href) || pathname === item.href ) && (
+                     <ul className="pl-7 pt-1 space-y-1 group-data-[collapsible=icon]:hidden">
+                       {item.subItems.map(subItem => (
+                         <li key={subItem.href}>
+                           <Link href={subItem.href} passHref legacyBehavior>
+                             <SidebarMenuButton
+                                asChild={false}
+                                size="sm"
+                                isActive={pathname === subItem.href}
+                                className="justify-start w-full text-muted-foreground hover:text-foreground"
+                              >
+                               <subItem.icon className="w-4 h-4 mr-2" />
+                               {subItem.label}
+                             </SidebarMenuButton>
+                           </Link>
+                         </li>
+                       ))}
+                     </ul>
+                  )}
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </ScrollArea>
+        </SidebarContent>
+
+        <SidebarFooter className="p-3 border-t">
+          <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
+            <Avatar className="group-data-[collapsible=icon]:hidden">
+              <AvatarImage src={`https://placehold.co/40x40.png?text=${user?.email?.[0]?.toUpperCase() ?? 'A'}`} alt={user?.email ?? "Admin"} data-ai-hint="user profile" />
+              <AvatarFallback>{user?.email?.[0]?.toUpperCase() ?? 'A'}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1 group-data-[collapsible=icon]:hidden">
+              <p className="text-sm font-medium truncate">{user?.email ?? "Admin User"}</p>
+              <p className="text-xs text-muted-foreground">Administrator</p>
+            </div>
+          </div>
+          <Link href="/" passHref legacyBehavior>
+            <SidebarMenuButton tooltip="Back to Site Home" className="mt-2 justify-start">
+                <Home className="w-5 h-5" />
+                <span className="group-data-[collapsible=icon]:hidden">Back to Home</span>
+            </SidebarMenuButton>
+          </Link>
+          <SidebarMenuButton onClick={handleLogout} tooltip="Logout" className="mt-1 justify-start">
+            <LogOut className="w-5 h-5" />
+            <span className="group-data-[collapsible=icon]:hidden">Logout</span>
+          </SidebarMenuButton>
+        </SidebarFooter>
+      </Sidebar>
+      <SidebarInset className="bg-slate-50">
+        <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 md:hidden">
+          <SidebarTrigger>
+            <PanelLeft className="h-5 w-5" />
+            <span className="sr-only">Toggle Menu</span>
+          </SidebarTrigger>
+          <Link href="/admin/dashboard" className="flex items-center gap-2">
+              <ShieldCheck className="w-6 h-6 text-primary" />
+              <h1 className="text-xl font-headline font-semibold text-primary">AssessPro</h1>
+          </Link>
+        </header>
+        <main className="p-6 min-h-screen">
+          {children}
+        </main>
+      </SidebarInset>
+    </>
+  );
+}
+
+
 export function AdminLayoutClient({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const pathname = usePathname();
   const { toast } = useToast();
 
   const handleLogout = async () => {
@@ -83,84 +193,9 @@ export function AdminLayoutClient({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen>
-      <Sidebar collapsible="icon" variant="sidebar" className="border-r">
-        <SidebarHeader className="p-4 items-center">
-            <Link href="/admin/dashboard" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
-                <ShieldCheck className="w-8 h-8 text-primary" />
-                <h1 className="text-2xl font-headline font-semibold text-primary group-data-[collapsible=icon]:hidden">AssessPro</h1>
-            </Link>
-          <div className="ml-auto group-data-[collapsible=icon]:hidden">
-            <SidebarTrigger />
-          </div>
-        </SidebarHeader>
-
-        <SidebarContent asChild>
-          <ScrollArea className="h-full">
-            <SidebarMenu className="px-2">
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <Link href={item.href} asChild>
-                    <SidebarMenuButton
-                      isActive={pathname === item.href || (item.subItems && pathname.startsWith(item.href)) || (item.href === "/admin/settings" && pathname.startsWith("/admin/settings"))}
-                      tooltip={item.label}
-                      className="justify-start"
-                    >
-                      <item.icon className="w-5 h-5" />
-                      <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
-                    </SidebarMenuButton>
-                  </Link>
-                  {item.subItems && (pathname.startsWith(item.href) || pathname === item.href ) && (
-                     <ul className="pl-7 pt-1 space-y-1 group-data-[collapsible=icon]:hidden">
-                       {item.subItems.map(subItem => (
-                         <li key={subItem.href}>
-                           <Link href={subItem.href} asChild>
-                             <SidebarMenuButton
-                                size="sm"
-                                isActive={pathname === subItem.href}
-                                className="justify-start w-full text-muted-foreground hover:text-foreground"
-                              >
-                               <subItem.icon className="w-4 h-4 mr-2" />
-                               {subItem.label}
-                             </SidebarMenuButton>
-                           </Link>
-                         </li>
-                       ))}
-                     </ul>
-                  )}
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </ScrollArea>
-        </SidebarContent>
-
-        <SidebarFooter className="p-3 border-t">
-          <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
-            <Avatar className="group-data-[collapsible=icon]:hidden">
-              <AvatarImage src={`https://placehold.co/40x40.png?text=${user?.email?.[0]?.toUpperCase() ?? 'A'}`} alt={user?.email ?? "Admin"} data-ai-hint="user profile" />
-              <AvatarFallback>{user?.email?.[0]?.toUpperCase() ?? 'A'}</AvatarFallback>
-            </Avatar>
-            <div className="flex-1 group-data-[collapsible=icon]:hidden">
-              <p className="text-sm font-medium truncate">{user?.email ?? "Admin User"}</p>
-              <p className="text-xs text-muted-foreground">Administrator</p>
-            </div>
-          </div>
-          <Link href="/" asChild>
-            <SidebarMenuButton tooltip="Back to Site Home" className="mt-2 justify-start">
-                <Home className="w-5 h-5" />
-                <span className="group-data-[collapsible=icon]:hidden">Back to Home</span>
-            </SidebarMenuButton>
-          </Link>
-          <SidebarMenuButton onClick={handleLogout} tooltip="Logout" className="mt-1 justify-start">
-            <LogOut className="w-5 h-5" />
-            <span className="group-data-[collapsible=icon]:hidden">Logout</span>
-          </SidebarMenuButton>
-        </SidebarFooter>
-      </Sidebar>
-      <SidebarInset className="bg-slate-50">
-        <main className="p-6 min-h-screen">
-          {children}
-        </main>
-      </SidebarInset>
+      <AdminLayoutInner user={user} handleLogout={handleLogout}>
+        {children}
+      </AdminLayoutInner>
     </SidebarProvider>
   );
 }

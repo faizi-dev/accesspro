@@ -39,11 +39,11 @@ async function getRenderedTemplate(templateId: EmailTemplate['id'], data: Record
 
 export async function GET(request: Request) {
   // 1. Authenticate the request
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    console.warn("CRON: Unauthorized attempt with incorrect or missing secret.");
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  // const authHeader = request.headers.get('authorization');
+  // if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  //   console.warn("CRON: Unauthorized attempt with incorrect or missing secret.");
+  //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // }
 
   // 2. Fetch all active (pending or started) assessment links
   const linksQuery = query(collection(db, 'customerLinks'), where("status", "in", ["pending", "started"]));

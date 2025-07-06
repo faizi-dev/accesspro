@@ -1,3 +1,4 @@
+
 import nodemailer from 'nodemailer';
 
 interface MailOptions {
@@ -39,3 +40,5 @@ export async function sendEmail({ to, subject, html }: MailOptions) {
     return { success: false, message: error.message };
   }
 }
+
+    

@@ -183,21 +183,26 @@ export default function EmailSettingsPage() {
             <CardTitle className="text-2xl font-headline">Email Notification Settings</CardTitle>
           </div>
           <CardDescription>
-            Manage the content of automated emails sent to customers. Your SMTP settings must be configured in your environment variables for emails to be sent.
+            Manage the content of automated emails sent to customers and administrators.
           </CardDescription>
         </CardHeader>
       </Card>
       
       <Card className="border-yellow-500 bg-yellow-50/50">
-          <CardHeader className="flex flex-row items-start gap-4">
-              <AlertTriangle className="h-6 w-6 text-yellow-700 mt-1"/>
-              <div>
-                  <CardTitle className="text-yellow-800">Reminder System Setup</CardTitle>
-                  <CardDescription className="text-yellow-700">
-                      The reminder emails below require a scheduled task (cron job) to run daily. You must set up an external service to send a GET request to <code className="font-mono bg-yellow-200/50 px-1 py-0.5 rounded">/api/cron/send-reminders</code> with an <code className="font-mono bg-yellow-200/50 px-1 py-0.5 rounded">Authorization: Bearer YOUR_CRON_SECRET</code> header.
-                  </CardDescription>
-              </div>
-          </CardHeader>
+        <CardHeader className="flex flex-row items-start gap-4">
+            <AlertTriangle className="h-6 w-6 text-yellow-700 mt-1"/>
+            <div>
+                <CardTitle className="text-yellow-800">Important: System Setup Required</CardTitle>
+                <CardDescription className="text-yellow-700 mt-2 space-y-2">
+                  <p>
+                      For any emails to be sent, you must configure your SMTP provider's credentials in your environment variables (`.env.local` file). This includes `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_FROM_EMAIL`.
+                  </p>
+                  <p>
+                      Additionally, for the reminder emails below to function, a scheduled task (cron job) must run daily. This task needs to send a GET request to <code className="font-mono bg-yellow-200/50 px-1 py-0.5 rounded">/api/cron/send-reminders</code> with an <code className="font-mono bg-yellow-200/50 px-1 py-0.5 rounded">Authorization: Bearer YOUR_CRON_SECRET</code> header.
+                  </p>
+                </CardDescription>
+            </div>
+        </CardHeader>
       </Card>
 
       <div className="space-y-6">
@@ -240,3 +245,5 @@ export default function EmailSettingsPage() {
     </div>
   );
 }
+
+    

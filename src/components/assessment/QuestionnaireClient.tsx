@@ -32,44 +32,16 @@ interface QuestionnaireClientProps {
   linkId: string;
 }
 
-// Helper function to shuffle an array (Fisher-Yates shuffle)
-function shuffleArray<T>(array: T[]): T[] {
-  const newArray = [...array];
-  for (let i = newArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-  }
-  return newArray;
-}
-
 
 export default function QuestionnaireClient({ questionnaire, customerLink, linkId }: QuestionnaireClientProps) {
   const [currentSectionIndex, setCurrentSectionIndex] = useState(customerLink.currentSectionIndex || 0);
   const [answers, setAnswers] = useState<Record<string, string>>(customerLink.responsesInProgress || {});
   const [isLoading, setIsLoading] = useState(false);
-  const [shuffledOptionsCache, setShuffledOptionsCache] = useState<Record<string, AnswerOption[]>>({});
   const [openAdditionalText, setOpenAdditionalText] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
   const router = useRouter();
 
   const currentSection = questionnaire.sections[currentSectionIndex];
-
-  useEffect(() => {
-    // Pre-shuffle options for all questions in the current section if not already cached
-    const newCache = { ...shuffledOptionsCache };
-    let cacheUpdated = false;
-    if (currentSection?.questions) {
-      currentSection.questions.forEach(q => {
-        if (!newCache[q.id]) {
-          newCache[q.id] = shuffleArray(q.options);
-          cacheUpdated = true;
-        }
-      });
-    }
-    if (cacheUpdated) {
-      setShuffledOptionsCache(newCache);
-    }
-  }, [currentSection, shuffledOptionsCache]);
   
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -227,7 +199,6 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
           </CardHeader>
           <CardContent className="space-y-6">
             {currentSection.questions.map((question, qIndex) => {
-                const shuffledQOptions = shuffledOptionsCache[question.id] || question.options;
                 return (
                   <div key={question.id} className="py-4 border-b last:border-b-0">
                     <p className="font-medium mb-2 text-foreground/90">
@@ -257,7 +228,7 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
                       onValueChange={(value) => handleAnswerChange(question.id, value)}
                       className="space-y-2"
                     >
-                      {shuffledQOptions.map((option) => (
+                      {question.options.map((option) => (
                         <div key={option.id} className="flex items-center space-x-3 p-3 rounded-md border hover:bg-accent/50 transition-colors cursor-pointer has-[:checked]:bg-accent has-[:checked]:border-primary">
                           <RadioGroupItem value={option.id} id={`${question.id}-${option.id}`} />
                           <Label htmlFor={`${question.id}-${option.id}`} className="flex-1 cursor-pointer text-foreground/80 has-[:checked]:text-accent-foreground">

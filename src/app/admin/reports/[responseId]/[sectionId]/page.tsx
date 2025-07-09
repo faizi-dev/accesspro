@@ -185,15 +185,15 @@ export default function SectionDetailPage() {
         </Button>
         <div className="flex gap-2">
             {prevSection ? (
-              <Link href={`/admin/reports/${responseId}/${prevSection.id}`} passHref legacyBehavior>
-                <Button asChild variant="outline"><a href={`/admin/reports/${responseId}/${prevSection.id}`}><ChevronLeft className="mr-2 h-4 w-4" /> Prev</a></Button>
+              <Link href={`/admin/reports/${responseId}/${prevSection.id}`}>
+                <Button variant="outline"><ChevronLeft className="mr-2 h-4 w-4" /> Prev</Button>
               </Link>
             ) : (
               <Button variant="outline" disabled><ChevronLeft className="mr-2 h-4 w-4" /> Prev</Button>
             )}
             {nextSection ? (
-              <Link href={`/admin/reports/${responseId}/${nextSection.id}`} passHref legacyBehavior>
-                <Button asChild variant="outline"><a href={`/admin/reports/${responseId}/${nextSection.id}`}>Next <ChevronRight className="ml-2 h-4 w-4" /></a></Button>
+              <Link href={`/admin/reports/${responseId}/${nextSection.id}`}>
+                <Button variant="outline">Next <ChevronRight className="ml-2 h-4 w-4" /></Button>
               </Link>
             ) : (
               <Button variant="outline" disabled>Next <ChevronRight className="ml-2 h-4 w-4" /></Button>

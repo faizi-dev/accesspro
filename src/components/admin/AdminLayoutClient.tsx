@@ -80,9 +80,8 @@ function AdminLayoutInner({ children, user, handleLogout }: { children: React.Re
             <SidebarMenu className="px-2">
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
-                  <Link href={item.href} passHref legacyBehavior>
+                  <Link href={item.href} asChild>
                     <SidebarMenuButton
-                      asChild={false}
                       isActive={pathname === item.href || (item.subItems && pathname.startsWith(item.href)) || (item.href === "/admin/settings" && pathname.startsWith("/admin/settings"))}
                       tooltip={item.label}
                       className="justify-start"
@@ -95,9 +94,8 @@ function AdminLayoutInner({ children, user, handleLogout }: { children: React.Re
                      <ul className="pl-7 pt-1 space-y-1 group-data-[collapsible=icon]:hidden">
                        {item.subItems.map(subItem => (
                          <li key={subItem.href}>
-                           <Link href={subItem.href} passHref legacyBehavior>
+                           <Link href={subItem.href} asChild>
                              <SidebarMenuButton
-                                asChild={false}
                                 size="sm"
                                 isActive={pathname === subItem.href}
                                 className="justify-start w-full text-muted-foreground hover:text-foreground"
@@ -127,7 +125,7 @@ function AdminLayoutInner({ children, user, handleLogout }: { children: React.Re
               <p className="text-xs text-muted-foreground">Administrator</p>
             </div>
           </div>
-          <Link href="/" passHref legacyBehavior>
+          <Link href="/" asChild>
             <SidebarMenuButton tooltip="Back to Site Home" className="mt-2 justify-start">
                 <Home className="w-5 h-5" />
                 <span className="group-data-[collapsible=icon]:hidden">Back to Home</span>

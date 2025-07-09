@@ -707,10 +707,10 @@ export default function AdminCustomersPage() {
                         <TableCell><span className={`px-2 py-1 text-xs rounded-full ${link.status === 'completed' ? 'bg-green-100 text-green-700' : link.status === 'pending' || link.status === 'started' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>{link.status}</span></TableCell>
                         <TableCell>{format(link.expiresAt, "PPP")}</TableCell>
                         <TableCell>
-                          <Link href={`/assessment/${link.id}`} target="_blank" legacyBehavior>
-                            <a className="text-primary hover:underline flex items-center text-sm">
+                          <Link href={`/assessment/${link.id}`} target="_blank">
+                            <span className="text-primary hover:underline flex items-center text-sm">
                               <ExternalLink className="h-3 w-3 mr-1"/> View
-                            </a>
+                            </span>
                           </Link>
                         </TableCell>
                         <TableCell className="text-right">

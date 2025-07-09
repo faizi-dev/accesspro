@@ -67,11 +67,11 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
     }
     if (currentSectionIndex < questionnaire.sections.length - 1) {
       setCurrentSectionIndex(prev => prev + 1);
-      await saveProgress(currentSectionIndex + 1);
+      await saveProgress(currentSectionIndex + 1, false); // false = don't redirect
     }
   };
 
-  const saveProgress = async (newSectionIndex?: number) => {
+  const saveProgress = async (newSectionIndex?: number, shouldRedirect: boolean = true) => {
     setIsLoading(true);
     try {
       const linkRef = doc(db, 'customerLinks', linkId);
@@ -80,7 +80,13 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
         currentSectionIndex: newSectionIndex !== undefined ? newSectionIndex : currentSectionIndex,
         status: "started",
       });
-      toast({ title: "Progress Saved", description: "Your answers have been saved." });
+
+      if (shouldRedirect) {
+        router.push(`/assessment/${linkId}/saved`);
+      } else {
+        toast({ title: "Progress Saved", description: "Your answers for this section have been saved." });
+      }
+
     } catch (error) {
       console.error("Error saving progress:", error);
       toast({ variant: "destructive", title: "Save Failed", description: "Could not save your progress." });

@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, Save, Send, ChevronLeft, ChevronRight, Info, ChevronUp, ChevronDown } from 'lucide-react';
+import { AlertCircle, CheckCircle, Save, Send, ChevronLeft, ChevronRight, Info, ChevronUp, ChevronDown, PlayCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import {
@@ -38,6 +38,7 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
   const [answers, setAnswers] = useState<Record<string, string>>(customerLink.responsesInProgress || {});
   const [isLoading, setIsLoading] = useState(false);
   const [openAdditionalText, setOpenAdditionalText] = useState<Record<string, boolean>>({});
+  const [showIntro, setShowIntro] = useState(customerLink.status === 'pending' && !!questionnaire.description);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -45,7 +46,7 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
   
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [currentSectionIndex]);
+  }, [currentSectionIndex, showIntro]);
 
   const toggleAdditionalText = (questionId: string) => {
     setOpenAdditionalText(prev => ({...prev, [questionId]: !prev[questionId]}));
@@ -71,6 +72,12 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
     }
   };
 
+  const startQuestionnaire = async () => {
+    setShowIntro(false);
+    // Mark as started in the database
+    await saveProgress(0, false);
+  }
+
   const saveProgress = async (newSectionIndex?: number, shouldRedirect: boolean = true) => {
     setIsLoading(true);
     try {
@@ -83,7 +90,7 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
 
       if (shouldRedirect) {
         router.push(`/assessment/${linkId}/saved`);
-      } else {
+      } else if (!showIntro) { // Only toast if not on intro screen
         toast({ title: "Progress Saved", description: "Your answers for this section have been saved." });
       }
 
@@ -179,6 +186,25 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
 
   const progressPercentage = ((currentSectionIndex + 1) / questionnaire.sections.length) * 100;
 
+  if (showIntro && questionnaire.description) {
+    return (
+        <div className="max-w-3xl mx-auto py-8 px-4 flex flex-col items-center justify-center min-h-[calc(100vh-4rem)]">
+            <Card className="w-full shadow-2xl animate-subtle-slide-in">
+                <CardHeader>
+                    <CardTitle className="text-3xl font-headline text-primary text-center">{questionnaire.description.header}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6 text-center">
+                    <p className="text-muted-foreground whitespace-pre-wrap">{questionnaire.description.details}</p>
+                    <Button onClick={startQuestionnaire} size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                        <PlayCircle className="mr-2 h-5 w-5" /> Start Assessment
+                    </Button>
+                </CardContent>
+            </Card>
+        </div>
+    );
+  }
+
+
   return (
     <div className="max-w-3xl mx-auto py-8 px-4 space-y-8">
       <Card className="shadow-xl animate-subtle-slide-in" style={{animationDelay: '0.1s'}}>
@@ -205,11 +231,12 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
           </CardHeader>
           <CardContent className="space-y-6">
             {currentSection.questions.map((question, qIndex) => {
+                const isAnswered = !!answers[question.id];
                 return (
-                  <div key={question.id} className="py-4 border-b last:border-b-0">
+                  <div key={question.id} className={`py-4 border-b last:border-b-0 transition-colors duration-300 ${isAnswered ? 'border-green-200' : 'border-border'}`}>
                     <p className="font-medium mb-2 text-foreground/90">
                       {qIndex + 1}. {question.question}
-                      {!answers[question.id] && <span className="text-destructive ml-1">*</span>}
+                      {!isAnswered && <span className="text-destructive ml-1">*</span>}
                     </p>
 
                     {question.additional_text && (

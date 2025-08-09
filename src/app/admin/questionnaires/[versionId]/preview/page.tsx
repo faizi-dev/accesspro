@@ -11,8 +11,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { ArrowLeft, FileText, CheckCircle, AlertCircle, Info } from 'lucide-react';
+import { ArrowLeft, FileText, CheckCircle, AlertCircle, Info, MessageSquareText } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Separator } from '@/components/ui/separator';
 
 export default function PreviewQuestionnairePage() {
   useRequireAuth();
@@ -111,6 +112,19 @@ export default function PreviewQuestionnairePage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {questionnaire.description && (
+            <>
+              <div className="border border-dashed border-primary/50 bg-primary/5 rounded-lg p-6 my-4">
+                <div className="flex items-center gap-3 mb-3">
+                    <MessageSquareText className="h-6 w-6 text-primary" />
+                    <h3 className="text-xl font-semibold text-primary/90">Introduction Screen</h3>
+                </div>
+                <h4 className="font-bold text-lg mb-2">{questionnaire.description.header}</h4>
+                <p className="text-sm text-foreground/80 whitespace-pre-wrap">{questionnaire.description.details}</p>
+              </div>
+              <Separator className="my-6" />
+            </>
+          )}
           <Accordion type="single" collapsible className="w-full">
             {questionnaire.sections.map((section: SectionType, sectionIndex: number) => (
               <AccordionItem value={`section-${sectionIndex}`} key={section.id || sectionIndex}>

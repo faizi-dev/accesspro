@@ -160,6 +160,7 @@ export default function UploadQuestionnairePage() {
 
       const versionDoc = {
         name: versionName, // This is the overall questionnaire version name
+        description: questionnaireData.description || null,
         sections: processedSections,
         isActive: false,
         createdAt: serverTimestamp(),
@@ -187,7 +188,11 @@ export default function UploadQuestionnairePage() {
   };
   
   const sampleJson = `{
-  "versionName": "Dynamic Assessment V5",
+  "versionName": "Dynamic Assessment V6",
+  "description": {
+    "header": "Welcome to Your Assessment",
+    "details": "This assessment is designed to provide insights into key areas of your operations. It consists of multiple sections with closed-ended questions.\\n\\nPlease choose the response that best reflects your current situation. The estimated time for completion is around 50 minutes. You can save your progress at any time and resume later using the same link.\\n\\nIf a question is unclear, use the 'Need help answering?' button for additional context."
+  },
   "sections": [
     {
       "name": "Core Competency A",
@@ -277,7 +282,7 @@ export default function UploadQuestionnairePage() {
             <CardTitle className="text-2xl font-headline">Upload New Questionnaire Version</CardTitle>
         </div>
         <CardDescription>
-          Provide a version name, then upload or paste a JSON file. Each section must have a `name` and `type` ('bar', 'matrix', 'count'). `bar` sections need `total_score`. `matrix` sections need `matrix_axis` ('x' or 'y').
+          Provide a version name, then upload or paste a JSON file. An optional `description` object with a `header` and `details` can be added for an intro screen. Each section must have a `name` and `type` ('bar', 'matrix', 'count'). `bar` sections need `total_score`. `matrix` sections need `matrix_axis` ('x' or 'y').
         </CardDescription>
       </CardHeader>
       <CardContent>

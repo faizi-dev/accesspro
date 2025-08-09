@@ -25,11 +25,17 @@ export interface Section {
   questions: Question[];
 }
 
+export interface QuestionnaireDescription {
+  header: string;
+  details: string;
+}
+
 export interface QuestionnaireVersion {
   id: string;
   name: string;
   createdAt: Date;
   isActive: boolean;
+  description?: QuestionnaireDescription;
   sections: Section[];
 }
 
@@ -54,6 +60,7 @@ export interface SectionUpload {
 
 export interface QuestionnaireUploadData {
   versionName?: string;
+  description?: QuestionnaireDescription;
   sections: SectionUpload[];
 }
 

@@ -61,6 +61,13 @@ const getScoreHexColor = (score: number): string => {
   return '718096'; // Gray
 };
 
+const defaultScoreLabels: ReportTotalAverage = {
+  green: "Body in health",
+  yellow: "Body with areas for improvement",
+  orange: "Body in difficulty to be analyzed",
+  red: "Body with urgent critical issues",
+};
+
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
@@ -77,15 +84,15 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 
-const Thermometer = ({ score, scoreLabels, maxScore = 4 }: { score: number; scoreLabels?: ReportTotalAverage; maxScore: number }) => {
+const Thermometer = ({ score, scoreLabels = defaultScoreLabels, maxScore = 4 }: { score: number; scoreLabels?: ReportTotalAverage; maxScore: number }) => {
     const percentage = Math.min(Math.max((score / maxScore) * 100, 0), 100);
     const colorClass = getScoreTextColorClassName(score).replace('text-', 'bg-');
     
     let label = "";
     if (scoreLabels) {
         if (score <= 1.5) label = scoreLabels.red;
-        else if (score <= 2.5) label = scoreLabels.orange;
-        else if (score <= 3.5) label = scoreLabels.yellow;
+        else if (score > 1.5 && score <= 2.5) label = scoreLabels.orange;
+        else if (score > 2.5 && score <= 3.5) label = scoreLabels.yellow;
         else if (score > 3.5) label = scoreLabels.green;
     }
 
@@ -799,7 +806,7 @@ export default function ReportDetailsPage() {
             <CardContent>
                 <Thermometer 
                     score={reportData.totalAverageRanking} 
-                    scoreLabels={questionnaire.report_total_average}
+                    scoreLabels={questionnaire.report_total_average ?? defaultScoreLabels}
                     maxScore={highestPossibleScore}
                 />
             </CardContent>

@@ -100,12 +100,12 @@ const Thermometer = ({ score, scoreLabels = defaultScoreLabels, maxScore = 4 }: 
         <div className="flex flex-col items-center justify-center gap-4 py-4">
             <div className="flex items-center justify-center gap-4">
                 <div className="w-16 h-48 flex items-end">
-                    <div className="relative w-12 h-44 mx-auto bg-muted/50 rounded-full border-2 border-gray-400">
+                    <div className="relative w-12 h-44 mx-auto bg-muted/50 rounded-full border-4 border-gray-400">
                         <div
                             className={`absolute bottom-0 left-0 right-0 rounded-b-full transition-all duration-500 ${colorBgClass}`}
                             style={{ height: `${percentage}%` }}
                         ></div>
-                        <div className={`absolute -bottom-5 left-1/2 -translate-x-1/2 w-16 h-16 rounded-full border-2 border-gray-400 ${colorBgClass} flex items-center justify-center`}>
+                        <div className={`absolute -bottom-5 left-1/2 -translate-x-1/2 w-16 h-16 rounded-full border-4 border-gray-400 ${colorBgClass} flex items-center justify-center`}>
                            <p className="text-white text-xl font-bold">{score.toFixed(2)}</p>
                         </div>
                     </div>
@@ -816,12 +816,12 @@ export default function ReportDetailsPage() {
       
       {/* --- TOTAL AVERAGE RANKING --- */}
       {reportData.barScores.length > 0 && (
-          <Card>
+          <Card className="print-shadow-none print-border-none">
             <CardHeader className="text-center">
               <CardTitle className="text-xl">Total Average Ranking</CardTitle>
               <CardDescription>Weighted composite score from all scored areas.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex justify-center">
                 <Thermometer 
                     score={reportData.totalAverageRanking} 
                     scoreLabels={questionnaire.report_total_average ?? defaultScoreLabels}
@@ -1077,5 +1077,7 @@ export default function ReportDetailsPage() {
 
 
 
+
+    
 
     

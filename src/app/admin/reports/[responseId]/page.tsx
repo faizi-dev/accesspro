@@ -97,26 +97,21 @@ const Thermometer = ({ score, scoreLabels = defaultScoreLabels, maxScore = 4 }: 
     }
 
     return (
-        <div className="flex flex-col items-center justify-center gap-4">
-            <div className="flex items-end justify-center gap-4">
-                 <div className="w-64 text-right">
-                    <p className={`text-5xl font-bold ${colorTextClass}`}>{score.toFixed(2)}</p>
-                </div>
-                <div className="w-12 h-64 flex items-end">
-                    <div className="relative w-8 h-56 mx-auto bg-muted/50 rounded-full border-2 border-gray-400">
+        <div className="flex flex-col items-center justify-center gap-4 py-4">
+            <div className="flex items-center justify-center gap-4">
+                <div className="w-16 h-48 flex items-end">
+                    <div className="relative w-12 h-44 mx-auto bg-muted/50 rounded-full border-2 border-gray-400">
                         <div
                             className={`absolute bottom-0 left-0 right-0 rounded-b-full transition-all duration-500 ${colorBgClass}`}
                             style={{ height: `${percentage}%` }}
                         ></div>
-                        <div className={`absolute -bottom-5 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full border-2 border-gray-400 ${colorBgClass}`}>
+                        <div className={`absolute -bottom-5 left-1/2 -translate-x-1/2 w-16 h-16 rounded-full border-2 border-gray-400 ${colorBgClass} flex items-center justify-center`}>
+                           <p className="text-white text-xl font-bold">{score.toFixed(2)}</p>
                         </div>
                     </div>
                 </div>
-               <div className="w-64 text-left">
-                    {/* Placeholder for spacing */}
-               </div>
             </div>
-            {label && <p className="mt-6 text-lg font-medium text-foreground/80 text-center">{label}</p>}
+            {label && <p className="mt-4 text-lg font-medium text-foreground/80 text-center">{label}</p>}
         </div>
     );
 };
@@ -141,6 +136,7 @@ export default function ReportDetailsPage() {
   const matrixChartRef = useRef<HTMLDivElement>(null);
   const barChartExportRef = useRef<HTMLDivElement>(null);
   const countAnalysisExportRef = useRef<HTMLDivElement>(null);
+  const thermometerExportRef = useRef<HTMLDivElement>(null);
 
 
   useEffect(() => {
@@ -402,6 +398,13 @@ export default function ReportDetailsPage() {
     const shouldIncludeMatrix = matrixAnalysis && selectedSections[matrixAnalysis.xSectionId] && selectedSections[matrixAnalysis.ySectionId];
 
     try {
+        let thermometerImageBuffer: Buffer | undefined;
+        if (thermometerExportRef.current && reportData.barScores.length > 0) {
+            const canvas = await html2canvas(thermometerExportRef.current, { backgroundColor: '#FFFFFF', scale: 2 });
+            const imageDataUrl = canvas.toDataURL('image/png');
+            thermometerImageBuffer = Buffer.from(imageDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
+        }
+
         let barChartImageBuffer: Buffer | undefined;
         if (barChartExportRef.current && includedBarScores.length > 0) {
             const canvas = await html2canvas(barChartExportRef.current, { backgroundColor: '#FFFFFF', scale: 2 });
@@ -442,15 +445,18 @@ export default function ReportDetailsPage() {
         docSections.push(new Paragraph({ text: `Questionnaire: ${response.questionnaireVersionName}` }));
         docSections.push(new Paragraph({ text: `Submitted: ${format(response.submittedAt, 'PPP p')}`, spacing: { after: 240 } }));
 
-        if (includedBarScores.length > 0) {
-             const totalAverageRankingForExport = includedBarScores.reduce((sum, score) => {
-                const weight = typeof score.sectionWeight === 'number' ? score.sectionWeight : 0;
-                return sum + (score.averageScore * weight);
-            }, 0);
-            
+        if (reportData.barScores.length > 0 && thermometerImageBuffer) {
              docSections.push(createHeading('Total Average Ranking'));
              docSections.push(new Paragraph({
-                children: [new TextRun({ text: totalAverageRankingForExport.toFixed(2), size: 48, bold: true })],
+                children: [
+                    new ImageRun({
+                        data: thermometerImageBuffer,
+                        transformation: {
+                            width: 250,
+                            height: (thermometerExportRef.current?.clientHeight || 300) * (250 / (thermometerExportRef.current?.clientWidth || 300)),
+                        },
+                    }),
+                ],
                 alignment: AlignmentType.CENTER
              }));
         }
@@ -698,62 +704,72 @@ export default function ReportDetailsPage() {
 
   return (
     <div className="space-y-8 p-4 md:p-6 print:p-2">
-      {/* Hidden container for DOCX export of bar charts */}
-      <div ref={barChartExportRef} className="absolute -left-[9999px] top-auto w-[800px] p-4 bg-white text-black">
-        <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Weighted Area Scores</h2>
-        <div className="space-y-4 pt-2">
-            {sortedIncludedBarScores.map((area) => (
-            <div key={area.sectionId} className="grid grid-cols-12 items-center gap-2 border-b pb-4 last:border-b-0 last:pb-0">
-                <p className="col-span-4 font-medium text-sm self-center whitespace-normal" title={area.sectionName}>
-                    {area.sectionName}
-                </p>
-                <div className="col-span-7">
-                <div className="w-full bg-slate-200 rounded-full h-3">
-                    <div
-                    className="h-3 rounded-full"
-                    style={{
-                        width: `${(area.averageScore / highestPossibleScore) * 100}%`,
-                        backgroundColor: getScoreFillColor(area.averageScore),
-                    }}
-                    ></div>
+      {/* Hidden containers for DOCX export */}
+      <div className="absolute -left-[9999px] top-auto w-[800px] p-4 bg-white text-black">
+        <div ref={thermometerExportRef} className="w-[300px] inline-block">
+            {reportData.barScores.length > 0 && (
+                <Thermometer 
+                    score={reportData.totalAverageRanking} 
+                    scoreLabels={questionnaire.report_total_average ?? defaultScoreLabels}
+                    maxScore={highestPossibleScore}
+                />
+            )}
+        </div>
+        <div ref={barChartExportRef}>
+            <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Weighted Area Scores</h2>
+            <div className="space-y-4 pt-2">
+                {sortedIncludedBarScores.map((area) => (
+                <div key={area.sectionId} className="grid grid-cols-12 items-center gap-2 border-b pb-4 last:border-b-0 last:pb-0">
+                    <p className="col-span-4 font-medium text-sm self-center whitespace-normal" title={area.sectionName}>
+                        {area.sectionName}
+                    </p>
+                    <div className="col-span-7">
+                    <div className="w-full bg-slate-200 rounded-full h-3">
+                        <div
+                        className="h-3 rounded-full"
+                        style={{
+                            width: `${(area.averageScore / highestPossibleScore) * 100}%`,
+                            backgroundColor: getScoreFillColor(area.averageScore),
+                        }}
+                        ></div>
+                    </div>
+                    </div>
+                    <p className={`col-span-1 text-right font-bold ${getScoreColorClass(area.averageScore).text}`}>
+                    {area.averageScore.toFixed(2)}
+                    </p>
                 </div>
-                </div>
-                <p className={`col-span-1 text-right font-bold ${getScoreColorClass(area.averageScore).text}`}>
-                {area.averageScore.toFixed(2)}
-                </p>
+                ))}
+            </div>
+        </div>
+        <div ref={countAnalysisExportRef} className="space-y-4">
+            <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Response Count Analysis</h2>
+            {includedCountAnalyses.map(analysis => (
+            <div key={analysis.sectionId} className="p-4 border border-slate-200 rounded-lg">
+                <h3 className="text-lg font-semibold mb-2">{analysis.sectionName}</h3>
+                <table className="w-full text-sm">
+                <thead className="border-b border-slate-300">
+                    <tr>
+                    <th className="p-2 text-left font-medium text-slate-600">Score Value</th>
+                    <th className="p-2 text-right font-medium text-slate-600">Times Selected</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {Object.entries(analysis.scoreCounts).sort(([, a], [, b]) => b - a).map(([score, count]) => (
+                    <tr key={score} className={analysis.mostFrequentScores.includes(Number(score)) ? 'bg-yellow-100' : ''}>
+                        <td className="p-2 font-medium">
+                        Score: {score}
+                        {analysis.mostFrequentScores.includes(Number(score)) && (
+                            <span className="ml-2 font-bold text-yellow-800">(Most Frequent)</span>
+                        )}
+                        </td>
+                        <td className="p-2 text-right">{count}</td>
+                    </tr>
+                    ))}
+                </tbody>
+                </table>
             </div>
             ))}
         </div>
-      </div>
-       {/* Hidden container for DOCX export of count analysis */}
-      <div ref={countAnalysisExportRef} className="absolute -left-[9999px] top-auto w-[800px] p-4 bg-white text-black space-y-4">
-        <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Response Count Analysis</h2>
-        {includedCountAnalyses.map(analysis => (
-          <div key={analysis.sectionId} className="p-4 border border-slate-200 rounded-lg">
-            <h3 className="text-lg font-semibold mb-2">{analysis.sectionName}</h3>
-            <table className="w-full text-sm">
-              <thead className="border-b border-slate-300">
-                <tr>
-                  <th className="p-2 text-left font-medium text-slate-600">Score Value</th>
-                  <th className="p-2 text-right font-medium text-slate-600">Times Selected</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(analysis.scoreCounts).sort(([, a], [, b]) => b - a).map(([score, count]) => (
-                  <tr key={score} className={analysis.mostFrequentScores.includes(Number(score)) ? 'bg-yellow-100' : ''}>
-                    <td className="p-2 font-medium">
-                      Score: {score}
-                      {analysis.mostFrequentScores.includes(Number(score)) && (
-                        <span className="ml-2 font-bold text-yellow-800">(Most Frequent)</span>
-                      )}
-                    </td>
-                    <td className="p-2 text-right">{count}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ))}
       </div>
       
       <style jsx global>{`
@@ -1060,3 +1076,6 @@ export default function ReportDetailsPage() {
     
 
 
+
+
+    

@@ -39,10 +39,10 @@ const getScoreFillColor = (score: number): string => {
 
 // Helper function to determine tailwind CSS class based on score
 const getScoreColorClass = (score: number): { text: string; bg: string } => {
-  if (score < 1.5) return { text: 'text-chart-5', bg: 'bg-chart-5' }; // Red
-  if (score >= 1.5 && score <= 2.5) return { text: 'text-chart-2', bg: 'bg-chart-2' }; // Orange
-  if (score > 2.5 && score <= 3.5) return { text: 'text-chart-3', bg: 'bg-chart-3' }; // Yellow
-  if (score > 3.5) return { text: 'text-chart-4', bg: 'bg-chart-4' }; // Green
+  if (score < 1.5) return { text: 'text-red-600', bg: 'bg-red-600' };
+  if (score >= 1.5 && score <= 2.5) return { text: 'text-orange-500', bg: 'bg-orange-500' };
+  if (score > 2.5 && score <= 3.5) return { text: 'text-yellow-500', bg: 'bg-yellow-500' };
+  if (score > 3.5) return { text: 'text-green-600', bg: 'bg-green-600' };
   return { text: 'text-muted-foreground', bg: 'bg-muted' };
 };
 
@@ -98,7 +98,10 @@ const Thermometer = ({ score, scoreLabels = defaultScoreLabels, maxScore = 4 }: 
 
     return (
         <div className="flex flex-col items-center justify-center gap-4">
-            <div className="flex items-center justify-center gap-4">
+            <div className="flex items-end justify-center gap-4">
+                 <div className="w-64 text-right">
+                    <p className={`text-5xl font-bold ${colorTextClass}`}>{score.toFixed(2)}</p>
+                </div>
                 <div className="w-12 h-64 flex items-end">
                     <div className="relative w-8 h-56 mx-auto bg-muted/50 rounded-full border-2 border-gray-400">
                         <div
@@ -109,12 +112,11 @@ const Thermometer = ({ score, scoreLabels = defaultScoreLabels, maxScore = 4 }: 
                         </div>
                     </div>
                 </div>
-                <div className="w-64 text-left">
-                    <p className={`text-5xl font-bold ${colorTextClass}`}>{score.toFixed(2)}</p>
-                    <p className="text-sm text-muted-foreground mt-1">Weighted composite score from all scored areas.</p>
-                </div>
+               <div className="w-64 text-left">
+                    {/* Placeholder for spacing */}
+               </div>
             </div>
-            {label && <p className="mt-4 text-lg font-medium text-foreground/80 text-center">{label}</p>}
+            {label && <p className="mt-6 text-lg font-medium text-foreground/80 text-center">{label}</p>}
         </div>
     );
 };
@@ -799,8 +801,9 @@ export default function ReportDetailsPage() {
       {/* --- TOTAL AVERAGE RANKING --- */}
       {reportData.barScores.length > 0 && (
           <Card>
-            <CardHeader>
-              <CardTitle className="text-xl text-center">Total Average Ranking</CardTitle>
+            <CardHeader className="text-center">
+              <CardTitle className="text-xl">Total Average Ranking</CardTitle>
+              <CardDescription>Weighted composite score from all scored areas.</CardDescription>
             </CardHeader>
             <CardContent>
                 <Thermometer 
@@ -1055,4 +1058,5 @@ export default function ReportDetailsPage() {
     
 
     
+
 

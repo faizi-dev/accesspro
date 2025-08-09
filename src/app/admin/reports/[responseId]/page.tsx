@@ -99,19 +99,16 @@ const Thermometer = ({ score, scoreLabels = defaultScoreLabels, maxScore = 4 }: 
     return (
         <div className="flex items-center justify-center gap-4 md:gap-8">
             <div className="w-12 h-64 flex items-end">
-                <div className="relative w-8 h-56 mx-auto bg-muted rounded-full border-4 border-gray-400">
+                <div className="relative w-8 h-56 mx-auto bg-muted/50 rounded-full border-2 border-gray-400">
                     <div
                         className={`absolute bottom-0 left-0 right-0 rounded-b-full transition-all duration-500 ${colorClass}`}
                         style={{ height: `${percentage}%` }}
                     ></div>
-                     <div className="absolute -bottom-6 -left-2 w-12 h-12 rounded-full border-4 border-gray-400 bg-gray-400">
-                         <div
-                            className={`w-full h-full rounded-full transition-all duration-500 ${colorClass}`}
-                        ></div>
+                     <div className={`absolute -bottom-6 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full border-2 border-gray-400 ${colorClass}`}>
                     </div>
                 </div>
             </div>
-            <div className="w-48 text-left">
+            <div className="w-64 text-left">
                 <p className={`text-5xl font-bold ${getScoreTextColorClassName(score)}`}>{score.toFixed(2)}</p>
                 {label && <p className="mt-2 text-lg font-medium text-foreground/80">{label}</p>}
                 <p className="text-sm text-muted-foreground mt-1">Weighted composite score from all scored areas.</p>
@@ -1052,5 +1049,7 @@ export default function ReportDetailsPage() {
   );
 }
 
+
+    
 
     

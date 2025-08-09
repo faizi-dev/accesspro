@@ -1,4 +1,5 @@
 
+
 export interface AnswerOption {
   id: string;
   text: string;
@@ -30,12 +31,20 @@ export interface QuestionnaireDescription {
   details: string;
 }
 
+export interface ReportTotalAverage {
+  green: string;
+  yellow: string;
+  orange: string;
+  red: string;
+}
+
 export interface QuestionnaireVersion {
   id: string;
   name: string;
   createdAt: Date;
   isActive: boolean;
   description?: QuestionnaireDescription;
+  report_total_average?: ReportTotalAverage;
   sections: Section[];
 }
 
@@ -61,6 +70,7 @@ export interface SectionUpload {
 export interface QuestionnaireUploadData {
   versionName?: string;
   description?: QuestionnaireDescription;
+  report_total_average?: ReportTotalAverage;
   sections: SectionUpload[];
 }
 

@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { db } from '@/lib/firebase/config';
 import { doc, getDoc, Timestamp, updateDoc } from 'firebase/firestore';
-import type { CustomerResponse, QuestionnaireVersion, Section as SectionType, AnswerOption, CalculatedSectionScore, CalculatedCountAnalysis, CalculatedMatrixAnalysis } from '@/lib/types';
+import type { CustomerResponse, QuestionnaireVersion, Section as SectionType, ReportTotalAverage, CalculatedSectionScore, CalculatedCountAnalysis, CalculatedMatrixAnalysis } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, FileText, AlertCircle, Edit, Star, Download, Loader2 } from 'lucide-react';
@@ -74,6 +74,43 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     );
   }
   return null;
+};
+
+
+const Thermometer = ({ score, scoreLabels, maxScore = 4 }: { score: number; scoreLabels?: ReportTotalAverage; maxScore: number }) => {
+    const percentage = Math.min(Math.max((score / maxScore) * 100, 0), 100);
+    const colorClass = getScoreTextColorClassName(score).replace('text-', 'bg-');
+    
+    let label = "";
+    if (scoreLabels) {
+        if (score <= 1.5) label = scoreLabels.red;
+        else if (score <= 2.5) label = scoreLabels.orange;
+        else if (score <= 3.5) label = scoreLabels.yellow;
+        else if (score > 3.5) label = scoreLabels.green;
+    }
+
+    return (
+        <div className="flex items-center justify-center gap-4 md:gap-8">
+            <div className="w-12 h-64 flex items-end">
+                <div className="relative w-8 h-56 mx-auto bg-muted rounded-full border-4 border-gray-400">
+                    <div
+                        className={`absolute bottom-0 left-0 right-0 rounded-b-full transition-all duration-500 ${colorClass}`}
+                        style={{ height: `${percentage}%` }}
+                    ></div>
+                     <div className="absolute -bottom-6 -left-2 w-12 h-12 rounded-full border-4 border-gray-400 bg-gray-400">
+                         <div
+                            className={`w-full h-full rounded-full transition-all duration-500 ${colorClass}`}
+                        ></div>
+                    </div>
+                </div>
+            </div>
+            <div className="w-48 text-left">
+                <p className={`text-5xl font-bold ${getScoreTextColorClassName(score)}`}>{score.toFixed(2)}</p>
+                {label && <p className="mt-2 text-lg font-medium text-foreground/80">{label}</p>}
+                <p className="text-sm text-muted-foreground mt-1">Weighted composite score from all scored areas.</p>
+            </div>
+        </div>
+    );
 };
 
 
@@ -759,9 +796,12 @@ export default function ReportDetailsPage() {
             <CardHeader>
               <CardTitle className="text-xl text-center">Total Average Ranking</CardTitle>
             </CardHeader>
-            <CardContent className="text-center">
-                <p className={`text-5xl font-bold ${getScoreTextColorClassName(reportData.totalAverageRanking)}`}>{reportData.totalAverageRanking.toFixed(2)}</p>
-                <p className="text-sm text-muted-foreground mt-1">Weighted composite score from all scored areas.</p>
+            <CardContent>
+                <Thermometer 
+                    score={reportData.totalAverageRanking} 
+                    scoreLabels={questionnaire.report_total_average}
+                    maxScore={highestPossibleScore}
+                />
             </CardContent>
           </Card>
       )}
@@ -1007,5 +1047,3 @@ export default function ReportDetailsPage() {
 
 
     
-
-

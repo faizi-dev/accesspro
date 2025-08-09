@@ -161,6 +161,7 @@ export default function UploadQuestionnairePage() {
       const versionDoc = {
         name: versionName, // This is the overall questionnaire version name
         description: questionnaireData.description || null,
+        report_total_average: questionnaireData.report_total_average || null,
         sections: processedSections,
         isActive: false,
         createdAt: serverTimestamp(),
@@ -188,10 +189,16 @@ export default function UploadQuestionnairePage() {
   };
   
   const sampleJson = `{
-  "versionName": "Dynamic Assessment V6",
+  "versionName": "Dynamic Assessment V7",
   "description": {
     "header": "Welcome to Your Assessment",
     "details": "This assessment is designed to provide insights into key areas of your operations. It consists of multiple sections with closed-ended questions.\\n\\nPlease choose the response that best reflects your current situation. The estimated time for completion is around 50 minutes. You can save your progress at any time and resume later using the same link.\\n\\nIf a question is unclear, use the 'Need help answering?' button for additional context."
+  },
+  "report_total_average": {
+    "green": "Body Healthy",
+    "yellow": "Body with areas for improvement",
+    "orange": "Body in difficulty to be analyzed",
+    "red": "Body with urgent critical issues"
   },
   "sections": [
     {

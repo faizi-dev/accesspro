@@ -30,8 +30,8 @@ import html2canvas from 'html2canvas';
 
 // Helper function to determine color based on score for recharts fill AND text
 const getScoreFillColor = (score: number): string => {
-  if (score <= 1.5) return 'hsl(var(--chart-5))'; // Red
-  if (score > 1.5 && score <= 2.5) return 'hsl(var(--chart-2))'; // Orange
+  if (score < 1.5) return 'hsl(var(--chart-5))'; // Red
+  if (score >= 1.5 && score <= 2.5) return 'hsl(var(--chart-2))'; // Orange
   if (score > 2.5 && score <= 3.5) return 'hsl(var(--chart-3))'; // Yellow
   if (score > 3.5) return 'hsl(var(--chart-4))'; // Green
   return 'hsl(var(--muted))';
@@ -39,8 +39,8 @@ const getScoreFillColor = (score: number): string => {
 
 // Helper function to determine tailwind text color class based on score
 const getScoreTextColorClassName = (score: number): string => {
-  if (score <= 1.5) return 'text-chart-5';
-  if (score > 1.5 && score <= 2.5) return 'text-chart-2';
+  if (score < 1.5) return 'text-chart-5';
+  if (score >= 1.5 && score <= 2.5) return 'text-chart-2';
   if (score > 2.5 && score <= 3.5) return 'text-chart-3';
   if (score > 3.5) return 'text-chart-4';
   return 'text-muted-foreground';
@@ -54,8 +54,8 @@ const getHighestPossibleOptionScore = (questions: SectionType['questions']): num
 
 // Helper function to get HEX color for DOCX export
 const getScoreHexColor = (score: number): string => {
-  if (score <= 1.5) return 'E53E3E'; // Red
-  if (score > 1.5 && score <= 2.5) return 'DD6B20'; // Orange
+  if (score < 1.5) return 'E53E3E'; // Red
+  if (score >= 1.5 && score <= 2.5) return 'DD6B20'; // Orange
   if (score > 2.5 && score <= 3.5) return 'D69E2E'; // Yellow
   if (score > 3.5) return '38A169'; // Green
   return '718096'; // Gray
@@ -90,29 +90,31 @@ const Thermometer = ({ score, scoreLabels = defaultScoreLabels, maxScore = 4 }: 
     
     let label = "";
     if (scoreLabels) {
-        if (score <= 1.5) label = scoreLabels.red;
-        else if (score > 1.5 && score <= 2.5) label = scoreLabels.orange;
+        if (score < 1.5) label = scoreLabels.red;
+        else if (score >= 1.5 && score <= 2.5) label = scoreLabels.orange;
         else if (score > 2.5 && score <= 3.5) label = scoreLabels.yellow;
         else if (score > 3.5) label = scoreLabels.green;
     }
 
     return (
-        <div className="flex items-center justify-center gap-4 md:gap-8">
-            <div className="w-12 h-64 flex items-end">
-                <div className="relative w-8 h-56 mx-auto bg-muted/50 rounded-full border-2 border-gray-400">
-                    <div
-                        className={`absolute bottom-0 left-0 right-0 rounded-b-full transition-all duration-500 ${colorClass}`}
-                        style={{ height: `${percentage}%` }}
-                    ></div>
-                     <div className={`absolute -bottom-6 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full border-2 border-gray-400 ${colorClass}`}>
+        <div className="flex flex-col items-center justify-center gap-4">
+            <div className="flex items-center justify-center gap-4">
+                <div className="w-12 h-64 flex items-end">
+                    <div className="relative w-8 h-56 mx-auto bg-muted/50 rounded-full border-2 border-gray-400">
+                        <div
+                            className={`absolute bottom-0 left-0 right-0 rounded-b-full transition-all duration-500 ${colorClass}`}
+                            style={{ height: `${percentage}%` }}
+                        ></div>
+                        <div className={`absolute -bottom-5 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full border-2 border-gray-400 ${colorClass}`}>
+                        </div>
                     </div>
                 </div>
+                <div className="w-64 text-left">
+                    <p className={`text-5xl font-bold ${getScoreTextColorClassName(score)}`}>{score.toFixed(2)}</p>
+                    <p className="text-sm text-muted-foreground mt-1">Weighted composite score from all scored areas.</p>
+                </div>
             </div>
-            <div className="w-64 text-left">
-                <p className={`text-5xl font-bold ${getScoreTextColorClassName(score)}`}>{score.toFixed(2)}</p>
-                {label && <p className="mt-2 text-lg font-medium text-foreground/80">{label}</p>}
-                <p className="text-sm text-muted-foreground mt-1">Weighted composite score from all scored areas.</p>
-            </div>
+            {label && <p className="mt-4 text-lg font-medium text-foreground/80 text-center">{label}</p>}
         </div>
     );
 };

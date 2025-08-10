@@ -13,6 +13,22 @@ export interface Question {
   additional_text?: string | null;
 }
 
+export interface AreaScoreText {
+  // For 'bar' type
+  score_less_than_1_5?: string;
+  score_between_1_51_and_2_5?: string;
+  score_between_2_51_and_3_5?: string;
+  score_greater_than_3_5?: string;
+  // For 'matrix' type
+  area_X_less_than_3_area_Y_less_than_3?: string;
+  area_X_less_than_3_area_Y_greater_than_3?: string;
+  area_X_greater_than_3_area_Y_less_than_3?: string;
+  area_X_greater_than_3_area_Y_greater_than_3?: string;
+  // For 'count' type
+  [key: `score_${number}`]: string;
+}
+
+
 export interface Section {
   id: string;
   name: string;
@@ -24,6 +40,7 @@ export interface Section {
   total_score: number | null;
   matrix_axis: 'x' | 'y' | null;
   questions: Question[];
+  area_score_text?: AreaScoreText | null;
 }
 
 export interface QuestionnaireDescription {
@@ -60,6 +77,7 @@ export interface SectionUpload {
   weight?: number;
   total_score?: number;
   matrix_axis?: 'x' | 'y';
+  area_score_text?: AreaScoreText;
   questions: Array<Omit<Question, 'id'> & {
     tempId?: string,
     additional_text?: string,
@@ -118,6 +136,7 @@ export interface CalculatedSectionScore {
   achievedScore: number;
   averageScore: number;
   weightedAverageScore: number;
+  analysisText?: string;
 }
 
 // New type for count analysis
@@ -128,6 +147,7 @@ export interface CalculatedCountAnalysis {
   scoreCounts: Record<string, number>;
   // An array of scores that are most frequent
   mostFrequentScores: number[];
+  analysisText?: string;
 }
 
 // New type for Matrix analysis
@@ -141,6 +161,7 @@ export interface CalculatedMatrixAnalysis {
   data: { x: number; y: number; name: string, parent: any }[];
   xAxisDomain: [number, number];
   yAxisDomain: [number, number];
+  analysisText?: string;
 }
 
 

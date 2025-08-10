@@ -112,6 +112,7 @@ export default function UploadQuestionnairePage() {
           weight: sectionUpload.weight || 0,
           total_score: sectionUpload.total_score ?? null, // Use nullish coalescing to allow 0
           matrix_axis: sectionUpload.matrix_axis || null,
+          area_score_text: sectionUpload.area_score_text || null,
           questions: sectionUpload.questions.map((questionUpload, qIdx) => {
             const sectionNameForError = `in section ${sIdx + 1} ("${sectionUpload.name}")`;
             const questionNameForError = `question ${qIdx + 1}`;
@@ -189,7 +190,7 @@ export default function UploadQuestionnairePage() {
   };
   
   const sampleJson = `{
-  "versionName": "Dynamic Assessment V7",
+  "versionName": "Dynamic Assessment V8",
   "description": {
     "header": "Welcome to Your Assessment",
     "details": "This assessment is designed to provide insights into key areas of your operations. It consists of multiple sections with closed-ended questions.\\n\\nPlease choose the response that best reflects your current situation. The estimated time for completion is around 50 minutes. You can save your progress at any time and resume later using the same link.\\n\\nIf a question is unclear, use the 'Need help answering?' button for additional context."
@@ -206,6 +207,12 @@ export default function UploadQuestionnairePage() {
       "type": "bar",
       "total_score": 0.2,
       "comment": "This is a default analysis for Competency A. It highlights key trends and observations.",
+      "area_score_text": {
+        "score_less_than_1_5": "Competency A is critically underdeveloped.",
+        "score_between_1_51_and_2_5": "Competency A requires significant improvement.",
+        "score_between_2_51_and_3_5": "Competency A is functional but has room for growth.",
+        "score_greater_than_3_5": "Competency A is a strong asset."
+      },
       "questions": [
         {
           "question": "How do you rate competency A?",
@@ -223,6 +230,12 @@ export default function UploadQuestionnairePage() {
       "name": "Core Competency B",
       "type": "bar",
       "total_score": 0.3,
+       "area_score_text": {
+        "score_less_than_1_5": "Competency B is a major weakness.",
+        "score_between_1_51_and_2_5": "Competency B performance is below expectations.",
+        "score_between_2_51_and_3_5": "Competency B is meeting requirements.",
+        "score_greater_than_3_5": "Competency B is a key organizational strength."
+      },
       "questions": [
         {
           "question": "How do you rate competency B?",
@@ -240,6 +253,12 @@ export default function UploadQuestionnairePage() {
       "description": "Rate the effort required for a key task.",
       "type": "matrix",
       "matrix_axis": "x",
+      "area_score_text": {
+        "area_X_less_than_3_area_Y_less_than_3": "OFFICINA FAMIGLIARE",
+        "area_X_less_than_3_area_Y_greater_than_3": "IMPRESA SISTEMA",
+        "area_X_greater_than_3_area_Y_less_than_3": "HUB MANAGERIALE",
+        "area_X_greater_than_3_area_Y_greater_than_3": "ECOSISTEMA EVOLUTO"
+      },
       "questions": [
         {
           "question": "Rate the 'Effort' required (1=Low, 5=High)",
@@ -266,6 +285,11 @@ export default function UploadQuestionnairePage() {
     {
       "name": "Tool Preference",
       "type": "count",
+      "area_score_text": {
+        "score_1": "Tool A is the most preferred choice for collaboration.",
+        "score_2": "Tool B is the most popular collaboration tool.",
+        "score_3": "Tool C is the winning tool for collaborative tasks."
+      },
       "questions": [
         {
           "question": "Which tool do you prefer for collaboration?",

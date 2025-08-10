@@ -6,10 +6,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { db } from '@/lib/firebase/config';
 import { doc, getDoc, Timestamp, updateDoc } from 'firebase/firestore';
-import type { CustomerResponse, QuestionnaireVersion, Section as SectionType, ReportTotalAverage, CalculatedSectionScore, CalculatedCountAnalysis, CalculatedMatrixAnalysis } from '@/lib/types';
+import type { AreaScoreText, CustomerResponse, QuestionnaireVersion, Section as SectionType, ReportTotalAverage, CalculatedSectionScore, CalculatedCountAnalysis, CalculatedMatrixAnalysis } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, FileText, AlertCircle, Edit, Star, Download, Loader2 } from 'lucide-react';
+import { ArrowLeft, FileText, AlertCircle, Edit, Star, Download, Loader2, MessageSquareQuote } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -66,6 +66,13 @@ const defaultScoreLabels: ReportTotalAverage = {
   yellow: "Body with areas for improvement",
   orange: "Body in difficulty to be analyzed",
   red: "Body with urgent critical issues",
+};
+
+const defaultMatrixLabels: AreaScoreText = {
+  area_X_less_than_3_area_Y_less_than_3: "OFFICINA FAMIGLIARE",
+  area_X_less_than_3_area_Y_greater_than_3: "IMPRESA SISTEMA",
+  area_X_greater_than_3_area_Y_less_than_3: "HUB MANAGERIALE",
+  area_X_greater_than_3_area_Y_greater_than_3: "ECOSISTEMA EVOLUTO"
 };
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -216,6 +223,14 @@ export default function ReportDetailsPage() {
             });
             const averageScore = numAnswered > 0 ? parseFloat((achievedScore / numAnswered).toFixed(2)) : 0;
             const sectionWeight = typeof section.total_score === 'number' ? section.total_score : (typeof section.weight === 'number' ? section.weight : 0);
+            
+            let analysisText = "";
+            if (section.area_score_text) {
+              if (averageScore < 1.5) analysisText = section.area_score_text.score_less_than_1_5 ?? "";
+              else if (averageScore >= 1.5 && averageScore <= 2.5) analysisText = section.area_score_text.score_between_1_51_and_2_5 ?? "";
+              else if (averageScore > 2.5 && averageScore <= 3.5) analysisText = section.area_score_text.score_between_2_51_and_3_5 ?? "";
+              else if (averageScore > 3.5) analysisText = section.area_score_text.score_greater_than_3_5 ?? "";
+            }
 
             barScores.push({
                 sectionId: section.id,
@@ -224,6 +239,7 @@ export default function ReportDetailsPage() {
                 achievedScore,
                 averageScore,
                 weightedAverageScore: parseFloat((averageScore * sectionWeight).toFixed(2)),
+                analysisText,
             });
         }
         
@@ -256,11 +272,18 @@ export default function ReportDetailsPage() {
                     .filter(score => scoreCounts[score] === maxCount)
                     .map(Number);
             }
+            let analysisText = "";
+            if(mostFrequentScores.length > 0 && section.area_score_text) {
+              // Handle multiple "most frequent" if they have the same count
+              analysisText = mostFrequentScores.map(score => section.area_score_text?.[`score_${score}`] ?? "").join(' / ');
+            }
+
             countAnalyses.push({
                 sectionId: section.id,
                 sectionName: section.name,
                 scoreCounts,
                 mostFrequentScores,
+                analysisText,
             });
         }
     });
@@ -273,6 +296,16 @@ export default function ReportDetailsPage() {
       if (xSection && ySection) {
           const xAxisLabel = xSection.name || "X-Axis";
           const yAxisLabel = ySection.name || "Y-Axis";
+          const xScore = xSection.answerScore;
+          const yScore = ySection.answerScore;
+
+          const matrixTextConfig = xSection.area_score_text || defaultMatrixLabels;
+          let analysisText = "";
+          if(xScore < 3 && yScore < 3) analysisText = matrixTextConfig.area_X_less_than_3_area_Y_less_than_3 ?? "";
+          else if(xScore < 3 && yScore >= 3) analysisText = matrixTextConfig.area_X_less_than_3_area_Y_greater_than_3 ?? "";
+          else if(xScore >= 3 && yScore < 3) analysisText = matrixTextConfig.area_X_greater_than_3_area_Y_less_than_3 ?? "";
+          else if(xScore >= 3 && yScore >= 3) analysisText = matrixTextConfig.area_X_greater_than_3_area_Y_greater_than_3 ?? "";
+
 
           const xQuestion = xSection.questions?.[0];
           const yQuestion = ySection.questions?.[0];
@@ -296,9 +329,10 @@ export default function ReportDetailsPage() {
               sectionName: 'Double-Entry Matrix Analysis',
               xAxisLabel,
               yAxisLabel,
+              analysisText,
               data: [{ 
-                  x: xSection.answerScore, 
-                  y: ySection.answerScore, 
+                  x: xScore, 
+                  y: yScore, 
                   name: 'Assessment Result',
                   parent: { xAxisLabel, yAxisLabel }
               }],
@@ -479,6 +513,9 @@ export default function ReportDetailsPage() {
 
         if (shouldIncludeMatrix && matrixChartImageBuffer) {
             docSections.push(createHeading('Double-Entry Matrix Analysis'));
+            if(matrixAnalysis.analysisText) {
+                docSections.push(new Paragraph({ text: matrixAnalysis.analysisText, alignment: AlignmentType.CENTER, bold: true, color: "5DADE2", spacing: { after: 120 } }));
+            }
             docSections.push(new Paragraph({
                 children: [
                     new ImageRun({
@@ -527,19 +564,10 @@ export default function ReportDetailsPage() {
                 docSections.push(new Paragraph({ text: section.description, style: "TOC1" }));
             }
 
-            // Calculate section average score
-            let achievedScore = 0;
-            let numAnswered = 0;
-            section.questions.forEach(q => {
-                const selectedOptionId = response.responses[q.id];
-                if (!selectedOptionId) return;
-                const selectedOption = q.options.find(opt => opt.id === selectedOptionId);
-                if (selectedOption && typeof selectedOption.score === 'number') {
-                    achievedScore += selectedOption.score;
-                    numAnswered++;
-                }
-            });
-            const sectionAverageScore = numAnswered > 0 ? parseFloat((achievedScore / numAnswered).toFixed(2)) : 0;
+            // Find calculated score for this section
+            const calculatedScoreData = reportData.barScores.find(s => s.sectionId === section.id);
+            const sectionAverageScore = calculatedScoreData?.averageScore || 0;
+            const analysisText = calculatedScoreData?.analysisText || "";
             
             docSections.push(new Paragraph({
                 children: [
@@ -548,6 +576,14 @@ export default function ReportDetailsPage() {
                 ],
                 spacing: { after: 240 }
             }));
+
+            if(analysisText) {
+                docSections.push(new Paragraph({
+                    children: [ new TextRun({ text: analysisText, bold: true, color: getScoreHexColor(sectionAverageScore) }) ],
+                    spacing: { after: 240 },
+                    alignment: AlignmentType.CENTER
+                }));
+            }
 
             docSections.push(createHeading("Question Breakdown", HeadingLevel.HEADING_3));
 
@@ -854,7 +890,15 @@ export default function ReportDetailsPage() {
                     <TableBody>
                         {sortedBarScores.map((area) => (
                             <TableRow key={area.sectionId}>
-                                <TableCell className="font-medium">{area.sectionName}</TableCell>
+                                <TableCell className="font-medium space-y-2">
+                                  <p>{area.sectionName}</p>
+                                   {area.analysisText && (
+                                     <div className="flex items-start gap-2 text-xs text-muted-foreground p-2 bg-secondary/30 rounded-md">
+                                        <MessageSquareQuote className="h-4 w-4 mt-0.5 shrink-0" />
+                                        <p className="italic">{area.analysisText}</p>
+                                     </div>
+                                   )}
+                                </TableCell>
                                 <TableCell>
                                     <div className="flex items-center gap-2">
                                         <div className="w-24 bg-muted rounded-full h-3">
@@ -915,6 +959,11 @@ export default function ReportDetailsPage() {
                     </div>
                  </CardHeader>
                  <CardContent>
+                    {matrixAnalysis.analysisText && (
+                        <div className="text-center mb-4 p-2 bg-secondary/50 rounded-md">
+                            <p className="font-semibold text-primary">{matrixAnalysis.analysisText}</p>
+                        </div>
+                    )}
                     <ResponsiveContainer width="100%" height={300}>
                         <ScatterChart
                             margin={{ top: 20, right: 30, bottom: 40, left: 30 }}
@@ -977,6 +1026,11 @@ export default function ReportDetailsPage() {
                         </div>
                     </CardHeader>
                     <CardContent>
+                        {analysis.analysisText && (
+                            <div className="text-center mb-4 p-2 bg-secondary/50 rounded-md">
+                                <p className="font-semibold text-primary">{analysis.analysisText}</p>
+                            </div>
+                        )}
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -1077,6 +1131,8 @@ export default function ReportDetailsPage() {
 
 
 
+
+    
 
     
 

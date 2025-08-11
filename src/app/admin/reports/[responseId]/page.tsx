@@ -39,14 +39,11 @@ const getScoreColorClass = (score: number): { text: string; bg: string } => {
 
 // Helper function to determine color based on score for recharts fill
 const getScoreFillColor = (score: number): string => {
-  const { bg } = getScoreColorClass(score);
-  switch(bg) {
-    case 'bg-red-600': return 'hsl(0 72% 51%)';
-    case 'bg-orange-500': return 'hsl(25 95% 53%)';
-    case 'bg-yellow-500': return 'hsl(48 96% 53%)';
-    case 'bg-green-600': return 'hsl(142 71% 45%)';
-    default: return 'hsl(var(--muted))';
-  }
+  if (score < 1.5) return 'hsl(0 72% 51%)';
+  if (score >= 1.5 && score <= 2.5) return 'hsl(25 95% 53%)';
+  if (score > 2.5 && score <= 3.5) return 'hsl(48 96% 53%)';
+  if (score > 3.5) return 'hsl(142 71% 45%)';
+  return 'hsl(var(--muted))';
 };
 
 const getHighestPossibleOptionScore = (questions: SectionType['questions']): number => {
@@ -567,8 +564,17 @@ export default function ReportDetailsPage() {
         // --- Detailed Section Pages ---
         const barSectionsForExport = includedSections.filter(s => s.type === 'bar');
 
+        if (barSectionsForExport.length > 0) {
+            docSections.push(new Paragraph({
+                text: "ALLEGATO 1: ANALISI DI DETTAGLIO DI OGNI AREA",
+                heading: HeadingLevel.HEADING_1,
+                alignment: AlignmentType.CENTER,
+                pageBreakBefore: true,
+                spacing: { after: 240 }
+            }));
+        }
+
         for (const section of barSectionsForExport) {
-            docSections.push(new Paragraph({ pageBreakBefore: true }));
             docSections.push(createHeading(section.name, HeadingLevel.HEADING_2));
             if (section.description) {
                 docSections.push(new Paragraph({ text: section.description, style: "TOC1" }));
@@ -689,6 +695,11 @@ export default function ReportDetailsPage() {
             const adminComment = response.adminComments?.[section.id] ?? "No admin comments added for this section yet.";
             docSections.push(new Paragraph({ text: "Admin Comments", bold: true, spacing: { after: 60 } }));
             docSections.push(new Paragraph({ text: adminComment, spacing: { after: 240 } }));
+
+            // Add page break after each detailed section except the last one
+            if (section !== barSectionsForExport[barSectionsForExport.length - 1]) {
+                docSections.push(new Paragraph({ pageBreakBefore: true }));
+            }
         }
 
         const doc = new Document({
@@ -769,7 +780,7 @@ export default function ReportDetailsPage() {
                     <div className="col-span-4 font-medium text-sm self-start whitespace-normal" title={area.sectionName}>
                         {area.sectionName}
                          {area.analysisText && (
-                            <p className="text-xs text-slate-500 italic mt-1">{area.analysisText}</p>
+                            <div className="text-xs text-slate-500 italic mt-1">{area.analysisText}</div>
                          )}
                     </div>
                     <div className="col-span-7 self-center">
@@ -909,7 +920,7 @@ export default function ReportDetailsPage() {
                         {sortedBarScores.map((area) => (
                             <TableRow key={area.sectionId}>
                                 <TableCell className="font-medium space-y-2 align-top">
-                                  <p>{area.sectionName}</p>
+                                  <div>{area.sectionName}</div>
                                    {area.analysisText && (
                                      <div className="flex items-start gap-2 text-xs text-muted-foreground p-2 bg-secondary/30 rounded-md">
                                         <MessageSquareQuote className="h-4 w-4 mt-0.5 shrink-0" />
@@ -1149,6 +1160,8 @@ export default function ReportDetailsPage() {
 
 
 
+
+    
 
     
 

@@ -28,15 +28,6 @@ import { saveAs } from 'file-saver';
 import html2canvas from 'html2canvas';
 
 
-// Helper function to determine color based on score for recharts fill
-const getScoreFillColor = (score: number): string => {
-  if (score < 1.5) return 'hsl(var(--chart-5))'; // Red
-  if (score >= 1.5 && score <= 2.5) return 'hsl(var(--chart-2))'; // Orange
-  if (score > 2.5 && score <= 3.5) return 'hsl(var(--chart-3))'; // Yellow
-  if (score > 3.5) return 'hsl(var(--chart-4))'; // Green
-  return 'hsl(var(--muted))';
-};
-
 // Helper function to determine tailwind CSS class based on score
 const getScoreColorClass = (score: number): { text: string; bg: string } => {
   if (score < 1.5) return { text: 'text-red-600', bg: 'bg-red-600' };
@@ -44,6 +35,18 @@ const getScoreColorClass = (score: number): { text: string; bg: string } => {
   if (score > 2.5 && score <= 3.5) return { text: 'text-yellow-500', bg: 'bg-yellow-500' };
   if (score > 3.5) return { text: 'text-green-600', bg: 'bg-green-600' };
   return { text: 'text-muted-foreground', bg: 'bg-muted' };
+};
+
+// Helper function to determine color based on score for recharts fill
+const getScoreFillColor = (score: number): string => {
+  const { bg } = getScoreColorClass(score);
+  switch(bg) {
+    case 'bg-red-600': return 'hsl(0 72% 51%)';
+    case 'bg-orange-500': return 'hsl(25 95% 53%)';
+    case 'bg-yellow-500': return 'hsl(48 96% 53%)';
+    case 'bg-green-600': return 'hsl(142 71% 45%)';
+    default: return 'hsl(var(--muted))';
+  }
 };
 
 const getHighestPossibleOptionScore = (questions: SectionType['questions']): number => {
@@ -62,10 +65,10 @@ const getScoreHexColor = (score: number): string => {
 };
 
 const defaultScoreLabels: ReportTotalAverage = {
-  green: "Body in health",
-  yellow: "Body with areas for improvement",
-  orange: "Body in difficulty to be analyzed",
-  red: "Body with urgent critical issues",
+  green: "Corpo in salute",
+  yellow: "Corpo con aree di miglioramento",
+  orange: "Corpo in difficolta da analizzare",
+  red: "Corpo con criticità urgenti",
 };
 
 const defaultMatrixLabels: AreaScoreText = {
@@ -93,7 +96,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 const Thermometer = ({ score, scoreLabels = defaultScoreLabels, maxScore = 4 }: { score: number; scoreLabels?: ReportTotalAverage; maxScore: number }) => {
     const percentage = Math.min(Math.max((score / maxScore) * 100, 0), 100);
-    const { text: colorTextClass, bg: colorBgClass } = getScoreColorClass(score);
+    const { bg: colorBgClass } = getScoreColorClass(score);
     
     let label = "";
     if (scoreLabels) {
@@ -118,7 +121,7 @@ const Thermometer = ({ score, scoreLabels = defaultScoreLabels, maxScore = 4 }: 
                     </div>
                 </div>
             </div>
-            {label && <p className="mt-4 text-lg font-medium text-foreground/80 text-center">{label}</p>}
+            {label && <p className="mt-8 text-lg font-medium text-foreground/80 text-center">{label}</p>}
         </div>
     );
 };
@@ -530,25 +533,27 @@ export default function ReportDetailsPage() {
             }));
         }
 
-        if (includedCountAnalyses.length > 0 && countAnalysisImageBuffer) {
+        if (includedCountAnalyses.length > 0) {
             docSections.push(createHeading('Response Count Analysis'));
             includedCountAnalyses.forEach(analysis => {
                 if(analysis.analysisText) {
                     docSections.push(new Paragraph({ text: `${analysis.sectionName}: ${analysis.analysisText}`, alignment: AlignmentType.CENTER, bold: true, color: "5DADE2", spacing: { after: 120 } }));
                 }
             });
-            docSections.push(new Paragraph({
-                children: [
-                    new ImageRun({
-                        data: countAnalysisImageBuffer,
-                        transformation: {
-                            width: 550,
-                            height: (countAnalysisExportRef.current?.clientHeight || 300) * (550 / (countAnalysisExportRef.current?.clientWidth || 800)),
-                        },
-                    }),
-                ],
-                alignment: AlignmentType.CENTER
-            }));
+            if (countAnalysisImageBuffer) {
+              docSections.push(new Paragraph({
+                  children: [
+                      new ImageRun({
+                          data: countAnalysisImageBuffer,
+                          transformation: {
+                              width: 550,
+                              height: (countAnalysisExportRef.current?.clientHeight || 300) * (550 / (countAnalysisExportRef.current?.clientWidth || 800)),
+                          },
+                      }),
+                  ],
+                  alignment: AlignmentType.CENTER
+              }));
+            }
         }
 
         docSections.push(createHeading('Summary & Comments'));
@@ -756,18 +761,18 @@ export default function ReportDetailsPage() {
                 />
             )}
         </div>
-        <div ref={barChartExportRef} className="px-4">
+        <div ref={barChartExportRef} className="p-4">
             <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Weighted Area Scores</h2>
             <div className="space-y-4 pt-2">
                 {sortedIncludedBarScores.map((area) => (
-                <div key={area.sectionId} className="grid grid-cols-12 items-center gap-2 border-b pb-4 last:border-b-0 last:pb-0">
-                    <p className="col-span-4 font-medium text-sm self-center whitespace-normal" title={area.sectionName}>
+                <div key={area.sectionId} className="grid grid-cols-12 items-start gap-2 border-b pb-4 last:border-b-0 last:pb-0">
+                    <div className="col-span-4 font-medium text-sm self-start whitespace-normal" title={area.sectionName}>
                         {area.sectionName}
                          {area.analysisText && (
                             <p className="text-xs text-slate-500 italic mt-1">{area.analysisText}</p>
                          )}
-                    </p>
-                    <div className="col-span-7">
+                    </div>
+                    <div className="col-span-7 self-center">
                     <div className="w-full bg-slate-200 rounded-full h-3">
                         <div
                         className="h-3 rounded-full"
@@ -778,14 +783,14 @@ export default function ReportDetailsPage() {
                         ></div>
                     </div>
                     </div>
-                    <p className={`col-span-1 text-right font-bold ${getScoreColorClass(area.averageScore).text}`}>
+                    <p className={`col-span-1 text-right font-bold ${getScoreColorClass(area.averageScore).text} self-center`}>
                     {area.averageScore.toFixed(2)}
                     </p>
                 </div>
                 ))}
             </div>
         </div>
-        <div ref={countAnalysisExportRef} className="space-y-4 px-4">
+        <div ref={countAnalysisExportRef} className="space-y-4 p-4">
             <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Response Count Analysis</h2>
             {includedCountAnalyses.map(analysis => (
             <div key={analysis.sectionId} className="p-4 border border-slate-200 rounded-lg">

@@ -72,7 +72,7 @@ const defaultMatrixLabels: AreaScoreText = {
   area_X_less_than_3_area_Y_less_than_3: "OFFICINA FAMIGLIARE",
   area_X_less_than_3_area_Y_greater_than_3: "IMPRESA SISTEMA",
   area_X_greater_than_3_area_Y_less_than_3: "HUB MANAGERIALE",
-  area_X_greater_than_3_area_Y_greater_than_3: "ECOSISTEMA EVOLUTO"
+  area_X_greater_than_3_area_Y_greater_than_3: "ECOSISTEMA EVOLUTO",
 };
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -532,6 +532,11 @@ export default function ReportDetailsPage() {
 
         if (includedCountAnalyses.length > 0 && countAnalysisImageBuffer) {
             docSections.push(createHeading('Response Count Analysis'));
+            includedCountAnalyses.forEach(analysis => {
+                if(analysis.analysisText) {
+                    docSections.push(new Paragraph({ text: `${analysis.sectionName}: ${analysis.analysisText}`, alignment: AlignmentType.CENTER, bold: true, color: "5DADE2", spacing: { after: 120 } }));
+                }
+            });
             docSections.push(new Paragraph({
                 children: [
                     new ImageRun({
@@ -1131,6 +1136,8 @@ export default function ReportDetailsPage() {
 
 
 
+
+    
 
     
 

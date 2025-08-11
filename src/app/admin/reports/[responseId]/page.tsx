@@ -763,6 +763,9 @@ export default function ReportDetailsPage() {
                 <div key={area.sectionId} className="grid grid-cols-12 items-center gap-2 border-b pb-4 last:border-b-0 last:pb-0">
                     <p className="col-span-4 font-medium text-sm self-center whitespace-normal" title={area.sectionName}>
                         {area.sectionName}
+                         {area.analysisText && (
+                            <p className="text-xs text-slate-500 italic mt-1">{area.analysisText}</p>
+                         )}
                     </p>
                     <div className="col-span-7">
                     <div className="w-full bg-slate-200 rounded-full h-3">
@@ -787,6 +790,11 @@ export default function ReportDetailsPage() {
             {includedCountAnalyses.map(analysis => (
             <div key={analysis.sectionId} className="p-4 border border-slate-200 rounded-lg">
                 <h3 className="text-lg font-semibold mb-2">{analysis.sectionName}</h3>
+                {analysis.analysisText && (
+                  <div className="text-center mb-4 p-2 bg-slate-100 rounded-md">
+                      <p className="font-semibold text-primary">{analysis.analysisText}</p>
+                  </div>
+                )}
                 <table className="w-full text-sm">
                 <thead className="border-b border-slate-300">
                     <tr>
@@ -895,7 +903,7 @@ export default function ReportDetailsPage() {
                     <TableBody>
                         {sortedBarScores.map((area) => (
                             <TableRow key={area.sectionId}>
-                                <TableCell className="font-medium space-y-2">
+                                <TableCell className="font-medium space-y-2 align-top">
                                   <p>{area.sectionName}</p>
                                    {area.analysisText && (
                                      <div className="flex items-start gap-2 text-xs text-muted-foreground p-2 bg-secondary/30 rounded-md">

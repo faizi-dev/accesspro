@@ -746,7 +746,7 @@ export default function ReportDetailsPage() {
   return (
     <div className="space-y-8 p-4 md:p-6 print:p-2">
       {/* Hidden containers for DOCX export */}
-      <div className="absolute -left-[9999px] top-auto w-[800px] p-4 bg-white text-black">
+      <div className="absolute -left-[9999px] top-auto w-[800px] bg-white text-black">
         <div ref={thermometerExportRef} className="w-[300px] inline-block">
             {reportData.barScores.length > 0 && (
                 <Thermometer 
@@ -756,7 +756,7 @@ export default function ReportDetailsPage() {
                 />
             )}
         </div>
-        <div ref={barChartExportRef}>
+        <div ref={barChartExportRef} className="px-4">
             <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Weighted Area Scores</h2>
             <div className="space-y-4 pt-2">
                 {sortedIncludedBarScores.map((area) => (
@@ -785,7 +785,7 @@ export default function ReportDetailsPage() {
                 ))}
             </div>
         </div>
-        <div ref={countAnalysisExportRef} className="space-y-4">
+        <div ref={countAnalysisExportRef} className="space-y-4 px-4">
             <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Response Count Analysis</h2>
             {includedCountAnalyses.map(analysis => (
             <div key={analysis.sectionId} className="p-4 border border-slate-200 rounded-lg">
@@ -1144,6 +1144,8 @@ export default function ReportDetailsPage() {
 
 
 
+
+    
 
     
 

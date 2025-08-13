@@ -90,7 +90,7 @@ export default function AdminDashboardPage() {
       <Card className="bg-card shadow-lg">
         <CardHeader>
           <CardTitle className="text-3xl font-headline">Welcome, {authUser?.email?.split('@')[0] || 'Admin'}!</CardTitle>
-          <CardDescription>Here's a quick overview of your AssessPro platform.</CardDescription>
+          <CardDescription>Here's a quick overview of your UpVal platform.</CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground">

@@ -25,7 +25,7 @@ const defaultTemplates: Record<string, Omit<EmailTemplate, 'id'>> = {
 <p><a href="{{assessmentLink}}">Click here to start your assessment</a></p>
 <p>This link will expire on {{expiryDate}}.</p>
 <p>Thank you,</p>
-<p>The AssessPro Team</p>
+<p>The UpVal Team</p>
     `.trim(),
     placeholders: ['{{customerName}}', '{{questionnaireName}}', '{{assessmentLink}}', '{{expiryDate}}'],
   },
@@ -36,7 +36,7 @@ const defaultTemplates: Record<string, Omit<EmailTemplate, 'id'>> = {
 <p>Thank you for completing the <strong>{{questionnaireName}}</strong> assessment.</p>
 <p>We have received your responses and will be in touch with you shortly with feedback.</p>
 <p>Best regards,</p>
-<p>The AssessPro Team</p>
+<p>The UpVal Team</p>
     `.trim(),
     placeholders: ['{{customerName}}', '{{questionnaireName}}'],
   },
@@ -47,7 +47,7 @@ const defaultTemplates: Record<string, Omit<EmailTemplate, 'id'>> = {
 <p>This is a friendly reminder that your link to complete the <strong>{{questionnaireName}}</strong> assessment will expire in 7 days, on {{expiryDate}}.</p>
 <p>You can continue your assessment here: <a href="{{assessmentLink}}">Continue Assessment</a></p>
 <p>Thank you,</p>
-<p>The AssessPro Team</p>
+<p>The UpVal Team</p>
     `.trim(),
     placeholders: ['{{customerName}}', '{{questionnaireName}}', '{{assessmentLink}}', '{{expiryDate}}'],
   },
@@ -58,7 +58,7 @@ const defaultTemplates: Record<string, Omit<EmailTemplate, 'id'>> = {
 <p>This is a final reminder that your link to complete the <strong>{{questionnaireName}}</strong> assessment will expire in just 2 days, on {{expiryDate}}.</p>
 <p>Please complete it at your earliest convenience: <a href="{{assessmentLink}}">Complete Your Assessment Now</a></p>
 <p>Thank you,</p>
-<p>The AssessPro Team</p>
+<p>The UpVal Team</p>
     `.trim(),
     placeholders: ['{{customerName}}', '{{questionnaireName}}', '{{assessmentLink}}', '{{expiryDate}}'],
   },

@@ -5,8 +5,8 @@ import { Suspense } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export const metadata: Metadata = {
-  title: 'AssessPro Admin',
-  description: 'Admin panel for AssessPro.',
+  title: 'UpVal Admin',
+  description: 'Admin panel for UpVal.',
 };
 
 function AdminLayoutFallback() {

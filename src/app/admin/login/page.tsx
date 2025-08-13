@@ -49,7 +49,7 @@ export default function AdminLoginPage() {
             <LogIn className="w-10 h-10 text-primary" />
           </div>
           <CardTitle className="text-3xl font-headline">Admin Login</CardTitle>
-          <CardDescription>Access the AssessPro management panel.</CardDescription>
+          <CardDescription>Access the UpVal management panel.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">

@@ -68,7 +68,7 @@ function AdminLayoutInner({ children, user, handleLogout }: { children: React.Re
         <SidebarHeader className="p-4 items-center">
             <Link href="/admin/dashboard" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
                 <ShieldCheck className="w-8 h-8 text-primary" />
-                <h1 className="text-2xl font-headline font-semibold text-primary group-data-[collapsible=icon]:hidden">AssessPro</h1>
+                <h1 className="text-2xl font-headline font-semibold text-primary group-data-[collapsible=icon]:hidden">UpVal</h1>
             </Link>
           <div className="ml-auto group-data-[collapsible=icon]:hidden">
             <SidebarTrigger />
@@ -145,7 +145,7 @@ function AdminLayoutInner({ children, user, handleLogout }: { children: React.Re
           </SidebarTrigger>
           <Link href="/admin/dashboard" className="flex items-center gap-2">
               <ShieldCheck className="w-6 h-6 text-primary" />
-              <h1 className="text-xl font-headline font-semibold text-primary">AssessPro</h1>
+              <h1 className="text-xl font-headline font-semibold text-primary">UpVal</h1>
           </Link>
         </header>
         <main className="p-6 min-h-screen">

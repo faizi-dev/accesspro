@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from '@/context/AuthContext';
 
 export const metadata: Metadata = {
-  title: 'AssessPro',
+  title: 'UpVal',
   description: 'Dynamic Questionnaire Platform for Customer Assessment',
 };
 

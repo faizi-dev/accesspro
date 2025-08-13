@@ -26,7 +26,7 @@ export async function sendEmail({ to, subject, html }: MailOptions) {
   }
 
   const mailOptions = {
-    from: `AssessPro <${process.env.SMTP_FROM_EMAIL}>`,
+    from: `UpVal <${process.env.SMTP_FROM_EMAIL}>`,
     to,
     subject,
     html,

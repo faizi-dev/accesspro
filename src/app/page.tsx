@@ -9,7 +9,7 @@ export default function HomePage() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-background to-blue-100 p-4">
       <header className="mb-12 text-center">
         <h1 className="text-5xl font-headline font-bold text-primary mb-4">
-          AssessPro
+          UpVal
         </h1>
         <p className="text-xl text-foreground/80 max-w-2xl">
           Dynamic Questionnaire Platform for Comprehensive Customer Assessment and Insightful Reporting.
@@ -64,7 +64,7 @@ export default function HomePage() {
       </div>
 
       <footer className="mt-16 text-center text-muted-foreground">
-        <p>&copy; {new Date().getFullYear()} AssessPro. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} UpVal. All rights reserved.</p>
       </footer>
     </div>
   );

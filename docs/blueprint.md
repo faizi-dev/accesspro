@@ -1,4 +1,4 @@
-# **App Name**: AssessPro
+# **App Name**: UpVal
 
 ## Core Features:
 

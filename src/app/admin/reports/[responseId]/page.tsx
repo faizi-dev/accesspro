@@ -463,9 +463,16 @@ export default function ReportDetailsPage() {
             spacing: { after: 240 },
         }));
 
-        docSections.push(new Paragraph({ text: `Report for: ${response.customerName || 'N/A'}` }));
-        docSections.push(new Paragraph({ text: `Questionnaire: ${response.questionnaireVersionName}` }));
-        docSections.push(new Paragraph({ text: `Submitted: ${format(response.submittedAt, 'PPP p')}`, spacing: { after: 240 } }));
+        const createHeaderLine = (text: string) => new Paragraph({
+            children: [new TextRun({ text, size: 28 })], // 14pt font size
+            spacing: { after: 60 }
+        });
+
+        docSections.push(createHeaderLine(`Report for: ${response.customerName || 'N/A'}`));
+        docSections.push(createHeaderLine(`Questionnaire: ${response.questionnaireVersionName}`));
+        docSections.push(createHeaderLine(`Submitted: ${format(response.submittedAt, 'PPP p')}`));
+        docSections.push(new Paragraph({ text: '', spacing: { after: 240 } }));
+
 
         if (reportData.barScores.length > 0 && thermometerImageBuffer) {
              docSections.push(createHeading('Total Average Ranking'));
@@ -481,15 +488,20 @@ export default function ReportDetailsPage() {
 
             const { text: scoreText } = getThermometerInfo(reportData.totalAverageRanking, questionnaire.report_total_average);
             docSections.push(new Paragraph({
-                text: `Total Average: ${reportData.totalAverageRanking.toFixed(2)} : ${scoreText}`,
+                 children: [
+                    new TextRun({
+                        text: `Total Average: ${reportData.totalAverageRanking.toFixed(2)} : ${scoreText}`,
+                        size: 32, // 16pt font size
+                        bold: true,
+                        color: getScoreHexColor(reportData.totalAverageRanking)
+                    })
+                ],
                 alignment: AlignmentType.CENTER,
-                bold: true,
                 spacing: { after: 240 }
             }));
         }
         
         if (includedBarScores.length > 0 && barChartImageBuffer) {
-            docSections.push(createHeading('Weighted Area Scores'));
             docSections.push(new Paragraph({
                 children: [
                     new ImageRun({
@@ -862,8 +874,7 @@ export default function ReportDetailsPage() {
           <CardDescription className="text-lg">
             Report for: {response.customerName || 'N/A'} <br />
             Questionnaire: {response.questionnaireVersionName} <br />
-            Submitted: {format(response.submittedAt, 'PPP p')}
-          </CardDescription>
+            Submitted: {format(response.submittedAt, 'PPP p')}</CardDescription>
         </CardHeader>
       </Card>
       
@@ -1139,3 +1150,5 @@ export default function ReportDetailsPage() {
     </div>
   );
 }
+
+    

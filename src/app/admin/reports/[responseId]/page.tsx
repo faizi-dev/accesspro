@@ -473,7 +473,7 @@ export default function ReportDetailsPage() {
                 children: [
                     new ImageRun({
                         data: thermometerImageBuffer,
-                        transformation: { width: 150, height: 150 },
+                        transformation: { width: 224, height: 224 },
                     }),
                 ],
                 alignment: AlignmentType.CENTER,
@@ -764,7 +764,7 @@ export default function ReportDetailsPage() {
             <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Weighted Area Scores</h2>
             <div className="space-y-4 pt-2">
                 {sortedIncludedBarScores.map((area) => (
-                <div key={area.sectionId} className="grid grid-cols-12 items-start gap-2 border-b pb-4 last:border-b-0 last:pb-0">
+                <div key={area.sectionId} className="grid grid-cols-12 items-start gap-2 border-b pb-4 last:border-b-0 last:pb-0 px-4">
                     <div className="col-span-4 font-medium text-sm self-start whitespace-normal">
                         <div>{area.sectionName}</div>
                          {area.analysisText && (
@@ -875,7 +875,7 @@ export default function ReportDetailsPage() {
                <CardDescription>Weighted composite score from all scored areas.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col items-center justify-center gap-4">
-                {thermometerImage && <img src={thermometerImage} alt={thermometerText} className="h-40 w-40 object-contain"/>}
+                {thermometerImage && <img src={thermometerImage} alt={thermometerText} className="h-56 w-56 object-contain"/>}
                 <p className={`text-lg font-bold text-center ${thermometerColor}`}>
                     Total Average: {reportData.totalAverageRanking.toFixed(2)} : {thermometerText}
                 </p>

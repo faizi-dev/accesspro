@@ -473,7 +473,7 @@ export default function ReportDetailsPage() {
                 children: [
                     new ImageRun({
                         data: thermometerImageBuffer,
-                        transformation: { width: 100, height: 100 },
+                        transformation: { width: 150, height: 150 },
                     }),
                 ],
                 alignment: AlignmentType.CENTER,
@@ -760,13 +760,13 @@ export default function ReportDetailsPage() {
     <div className="space-y-8 p-4 md:p-6 print:p-2">
       {/* Hidden containers for DOCX export */}
       <div className="absolute -left-[9999px] top-auto w-[800px] bg-white text-black p-4">
-        <div ref={barChartExportRef} className="p-4">
+        <div ref={barChartExportRef} className="space-y-4 p-8">
             <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Weighted Area Scores</h2>
             <div className="space-y-4 pt-2">
                 {sortedIncludedBarScores.map((area) => (
                 <div key={area.sectionId} className="grid grid-cols-12 items-start gap-2 border-b pb-4 last:border-b-0 last:pb-0">
-                    <div className="col-span-4 font-medium text-sm self-start whitespace-normal" title={area.sectionName}>
-                        {area.sectionName}
+                    <div className="col-span-4 font-medium text-sm self-start whitespace-normal">
+                        <div>{area.sectionName}</div>
                          {area.analysisText && (
                             <div className="text-xs text-slate-500 italic mt-1">{area.analysisText}</div>
                          )}
@@ -789,7 +789,7 @@ export default function ReportDetailsPage() {
                 ))}
             </div>
         </div>
-        <div ref={countAnalysisExportRef} className="space-y-4 p-4">
+        <div ref={countAnalysisExportRef} className="space-y-4 p-8">
             <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Response Count Analysis</h2>
             {includedCountAnalyses.map(analysis => (
             <div key={analysis.sectionId} className="p-4 border border-slate-200 rounded-lg">
@@ -875,7 +875,7 @@ export default function ReportDetailsPage() {
                <CardDescription>Weighted composite score from all scored areas.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col items-center justify-center gap-4">
-                {thermometerImage && <img src={thermometerImage} alt={thermometerText} className="h-24 w-24 object-contain"/>}
+                {thermometerImage && <img src={thermometerImage} alt={thermometerText} className="h-40 w-40 object-contain"/>}
                 <p className={`text-lg font-bold text-center ${thermometerColor}`}>
                     Total Average: {reportData.totalAverageRanking.toFixed(2)} : {thermometerText}
                 </p>

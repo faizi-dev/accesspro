@@ -75,6 +75,24 @@ const defaultMatrixLabels: AreaScoreText = {
   area_X_greater_than_3_area_Y_greater_than_3: "ECOSISTEMA EVOLUTO",
 };
 
+// New helper for thermometer image and text
+const getThermometerInfo = (score: number, scoreLabels: ReportTotalAverage = defaultScoreLabels) => {
+    if (score < 1.5) {
+        return { image: '/red_thermometer.png', text: scoreLabels.red, color: 'text-red-600' };
+    }
+    if (score >= 1.5 && score <= 2.5) {
+        return { image: '/orange_thermometer.png', text: scoreLabels.orange, color: 'text-orange-500' };
+    }
+    if (score > 2.5 && score <= 3.5) {
+        return { image: '/yellow_thermometer.png', text: scoreLabels.yellow, color: 'text-yellow-500' };
+    }
+    if (score > 3.5) {
+        return { image: '/green_thermometer.png', text: scoreLabels.green, color: 'text-green-600' };
+    }
+    return { image: '', text: '', color: 'text-muted-foreground' };
+};
+
+
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
@@ -89,40 +107,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   }
   return null;
 };
-
-
-const Thermometer = ({ score, scoreLabels = defaultScoreLabels, maxScore = 4 }: { score: number; scoreLabels?: ReportTotalAverage; maxScore: number }) => {
-    const percentage = Math.min(Math.max((score / maxScore) * 100, 0), 100);
-    const { bg: colorBgClass } = getScoreColorClass(score);
-    
-    let label = "";
-    if (scoreLabels) {
-        if (score < 1.5) label = scoreLabels.red;
-        else if (score >= 1.5 && score <= 2.5) label = scoreLabels.orange;
-        else if (score > 2.5 && score <= 3.5) label = scoreLabels.yellow;
-        else if (score > 3.5) label = scoreLabels.green;
-    }
-
-    return (
-        <div className="flex flex-col items-center justify-center gap-4 py-4">
-            <div className="flex items-center justify-center gap-4">
-                <div className="w-16 h-48 flex items-end">
-                    <div className="relative w-12 h-44 mx-auto bg-muted/50 rounded-full border-4 border-gray-400">
-                        <div
-                            className={`absolute bottom-0 left-0 right-0 rounded-b-full transition-all duration-500 ${colorBgClass}`}
-                            style={{ height: `${percentage}%` }}
-                        ></div>
-                        <div className={`absolute -bottom-5 left-1/2 -translate-x-1/2 w-16 h-16 rounded-full border-4 border-gray-400 ${colorBgClass} flex items-center justify-center`}>
-                           <p className="text-white text-xl font-bold">{score.toFixed(2)}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {label && <p className="mt-8 text-lg font-medium text-foreground/80 text-center">{label}</p>}
-        </div>
-    );
-};
-
 
 export default function ReportDetailsPage() {
   useRequireAuth();
@@ -143,9 +127,7 @@ export default function ReportDetailsPage() {
   const matrixChartRef = useRef<HTMLDivElement>(null);
   const barChartExportRef = useRef<HTMLDivElement>(null);
   const countAnalysisExportRef = useRef<HTMLDivElement>(null);
-  const thermometerExportRef = useRef<HTMLDivElement>(null);
-
-
+  
   useEffect(() => {
     if (responseId) {
       const fetchData = async () => {
@@ -433,10 +415,16 @@ export default function ReportDetailsPage() {
 
     try {
         let thermometerImageBuffer: Buffer | undefined;
-        if (thermometerExportRef.current && reportData.barScores.length > 0) {
-            const canvas = await html2canvas(thermometerExportRef.current, { backgroundColor: '#FFFFFF', scale: 2 });
-            const imageDataUrl = canvas.toDataURL('image/png');
-            thermometerImageBuffer = Buffer.from(imageDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
+        if (reportData.barScores.length > 0) {
+            const { image: thermometerImageSrc } = getThermometerInfo(
+                reportData.totalAverageRanking,
+                questionnaire.report_total_average
+            );
+            if (thermometerImageSrc) {
+                const imageUrl = `${window.location.origin}${thermometerImageSrc}`;
+                const imageBlob = await (await fetch(imageUrl)).blob();
+                thermometerImageBuffer = Buffer.from(await imageBlob.arrayBuffer());
+            }
         }
 
         let barChartImageBuffer: Buffer | undefined;
@@ -485,14 +473,19 @@ export default function ReportDetailsPage() {
                 children: [
                     new ImageRun({
                         data: thermometerImageBuffer,
-                        transformation: {
-                            width: 250,
-                            height: (thermometerExportRef.current?.clientHeight || 300) * (250 / (thermometerExportRef.current?.clientWidth || 300)),
-                        },
+                        transformation: { width: 100, height: 100 },
                     }),
                 ],
-                alignment: AlignmentType.CENTER
+                alignment: AlignmentType.CENTER,
              }));
+
+            const { text: scoreText } = getThermometerInfo(reportData.totalAverageRanking, questionnaire.report_total_average);
+            docSections.push(new Paragraph({
+                text: `Total Average: ${reportData.totalAverageRanking.toFixed(2)} : ${scoreText}`,
+                alignment: AlignmentType.CENTER,
+                bold: true,
+                spacing: { after: 240 }
+            }));
         }
         
         if (includedBarScores.length > 0 && barChartImageBuffer) {
@@ -756,22 +749,17 @@ export default function ReportDetailsPage() {
   const matrixAnalysis = reportData.matrixAnalyses[0];
   const shouldIncludeMatrix = matrixAnalysis && selectedSections[matrixAnalysis.xSectionId] && selectedSections[matrixAnalysis.ySectionId];
 
+  const { image: thermometerImage, text: thermometerText, color: thermometerColor } = getThermometerInfo(
+    reportData.totalAverageRanking,
+    questionnaire.report_total_average
+  );
 
   const staticExecutiveText = "This executive summary provides a high-level overview of the assessment results. Scores are color-coded for quick identification of strengths and areas for attention. Weighted averages reflect the relative importance of each area as defined in the questionnaire structure.";
 
   return (
     <div className="space-y-8 p-4 md:p-6 print:p-2">
       {/* Hidden containers for DOCX export */}
-      <div className="absolute -left-[9999px] top-auto w-[800px] bg-white text-black">
-        <div ref={thermometerExportRef} className="w-[300px] inline-block">
-            {reportData.barScores.length > 0 && (
-                <Thermometer 
-                    score={reportData.totalAverageRanking} 
-                    scoreLabels={questionnaire.report_total_average ?? defaultScoreLabels}
-                    maxScore={highestPossibleScore}
-                />
-            )}
-        </div>
+      <div className="absolute -left-[9999px] top-auto w-[800px] bg-white text-black p-4">
         <div ref={barChartExportRef} className="p-4">
             <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Weighted Area Scores</h2>
             <div className="space-y-4 pt-2">
@@ -884,14 +872,13 @@ export default function ReportDetailsPage() {
           <Card className="print-shadow-none print-border-none">
             <CardHeader className="text-center">
               <CardTitle className="text-xl">Total Average Ranking</CardTitle>
-              <CardDescription>Weighted composite score from all scored areas.</CardDescription>
+               <CardDescription>Weighted composite score from all scored areas.</CardDescription>
             </CardHeader>
-            <CardContent className="flex justify-center">
-                <Thermometer 
-                    score={reportData.totalAverageRanking} 
-                    scoreLabels={questionnaire.report_total_average ?? defaultScoreLabels}
-                    maxScore={highestPossibleScore}
-                />
+            <CardContent className="flex flex-col items-center justify-center gap-4">
+                {thermometerImage && <img src={thermometerImage} alt={thermometerText} className="h-24 w-24 object-contain"/>}
+                <p className={`text-lg font-bold text-center ${thermometerColor}`}>
+                    Total Average: {reportData.totalAverageRanking.toFixed(2)} : {thermometerText}
+                </p>
             </CardContent>
           </Card>
       )}
@@ -1152,25 +1139,3 @@ export default function ReportDetailsPage() {
     </div>
   );
 }
-
-
-    
-
-    
-
-
-
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    

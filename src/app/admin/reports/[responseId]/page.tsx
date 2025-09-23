@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from 'react';
@@ -130,7 +129,6 @@ export default function ReportDetailsPage() {
   const matrixChartRef = useRef<HTMLDivElement>(null);
   const barChartExportRef = useRef<HTMLDivElement>(null);
   const countAnalysisExportRef = useRef<HTMLDivElement>(null);
-  const thermometerExportRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
     if (responseId) {
@@ -419,10 +417,16 @@ export default function ReportDetailsPage() {
 
     try {
         let thermometerImageBuffer: Buffer | undefined;
-        if (thermometerExportRef.current && reportData.barScores.length > 0) {
-             const canvas = await html2canvas(thermometerExportRef.current, { backgroundColor: null, scale: 2 });
-             const imageDataUrl = canvas.toDataURL('image/png');
-             thermometerImageBuffer = Buffer.from(imageDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
+        if (reportData.barScores.length > 0) {
+            const { image: thermometerImageSrc } = getThermometerInfo(
+                reportData.totalAverageRanking,
+                questionnaire.report_total_average
+            );
+            if (thermometerImageSrc) {
+                const imageUrl = `${window.location.origin}${thermometerImageSrc}`;
+                const imageBlob = await (await fetch(imageUrl)).blob();
+                thermometerImageBuffer = Buffer.from(await imageBlob.arrayBuffer());
+            }
         }
 
         let barChartImageBuffer: Buffer | undefined;
@@ -769,12 +773,10 @@ export default function ReportDetailsPage() {
   return (
     <div className="space-y-8 p-4 md:p-6 print:p-2">
       {/* Hidden containers for DOCX export */}
-      <div className="absolute -left-[9999px] top-auto w-auto bg-white text-black p-4">
-        <div ref={thermometerExportRef}>
-            {thermometerImage && <img src={thermometerImage} alt={thermometerText} className="h-56 w-56 object-contain"/>}
-        </div>
-        <div ref={barChartExportRef} className="space-y-4 p-8 w-[800px]">
-             <div className="space-y-4 pt-2">
+      <div className="absolute -left-[9999px] top-auto w-[800px] bg-white text-black p-4">
+        <div ref={barChartExportRef} className="space-y-4 p-8">
+            <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Weighted Area Scores</h2>
+            <div className="space-y-4 pt-2">
                 {sortedIncludedBarScores.map((area) => (
                 <div key={area.sectionId} className="grid grid-cols-12 items-start gap-2 border-b pb-4 last:border-b-0 last:pb-0 px-4">
                     <div className="col-span-4 font-medium text-sm self-start whitespace-normal">
@@ -1194,5 +1196,3 @@ export default function ReportDetailsPage() {
     </div>
   );
 }
-
-    

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from 'react';
@@ -9,7 +10,7 @@ import { doc, getDoc, Timestamp, updateDoc } from 'firebase/firestore';
 import type { AreaScoreText, CustomerResponse, QuestionnaireVersion, Section as SectionType, ReportTotalAverage, CalculatedSectionScore, CalculatedCountAnalysis, CalculatedMatrixAnalysis } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, FileText, AlertCircle, Edit, Star, Download, Loader2, MessageSquareQuote } from 'lucide-react';
+import { ArrowLeft, FileText, AlertCircle, Edit, Star, Download, Loader2, MessageSquareQuote, ListOrdered } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,6 +21,8 @@ import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Label as RechartsLabel,
 } from 'recharts';
@@ -127,6 +130,7 @@ export default function ReportDetailsPage() {
   const matrixChartRef = useRef<HTMLDivElement>(null);
   const barChartExportRef = useRef<HTMLDivElement>(null);
   const countAnalysisExportRef = useRef<HTMLDivElement>(null);
+  const thermometerExportRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
     if (responseId) {
@@ -415,16 +419,10 @@ export default function ReportDetailsPage() {
 
     try {
         let thermometerImageBuffer: Buffer | undefined;
-        if (reportData.barScores.length > 0) {
-            const { image: thermometerImageSrc } = getThermometerInfo(
-                reportData.totalAverageRanking,
-                questionnaire.report_total_average
-            );
-            if (thermometerImageSrc) {
-                const imageUrl = `${window.location.origin}${thermometerImageSrc}`;
-                const imageBlob = await (await fetch(imageUrl)).blob();
-                thermometerImageBuffer = Buffer.from(await imageBlob.arrayBuffer());
-            }
+        if (thermometerExportRef.current && reportData.barScores.length > 0) {
+             const canvas = await html2canvas(thermometerExportRef.current, { backgroundColor: null, scale: 2 });
+             const imageDataUrl = canvas.toDataURL('image/png');
+             thermometerImageBuffer = Buffer.from(imageDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
         }
 
         let barChartImageBuffer: Buffer | undefined;
@@ -771,10 +769,12 @@ export default function ReportDetailsPage() {
   return (
     <div className="space-y-8 p-4 md:p-6 print:p-2">
       {/* Hidden containers for DOCX export */}
-      <div className="absolute -left-[9999px] top-auto w-[800px] bg-white text-black p-4">
-        <div ref={barChartExportRef} className="space-y-4 p-8">
-            <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Weighted Area Scores</h2>
-            <div className="space-y-4 pt-2">
+      <div className="absolute -left-[9999px] top-auto w-auto bg-white text-black p-4">
+        <div ref={thermometerExportRef}>
+            {thermometerImage && <img src={thermometerImage} alt={thermometerText} className="h-56 w-56 object-contain"/>}
+        </div>
+        <div ref={barChartExportRef} className="space-y-4 p-8 w-[800px]">
+             <div className="space-y-4 pt-2">
                 {sortedIncludedBarScores.map((area) => (
                 <div key={area.sectionId} className="grid grid-cols-12 items-start gap-2 border-b pb-4 last:border-b-0 last:pb-0 px-4">
                     <div className="col-span-4 font-medium text-sm self-start whitespace-normal">
@@ -801,7 +801,7 @@ export default function ReportDetailsPage() {
                 ))}
             </div>
         </div>
-        <div ref={countAnalysisExportRef} className="space-y-4 p-8">
+        <div ref={countAnalysisExportRef} className="space-y-4 p-8 w-[800px]">
             <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Response Count Analysis</h2>
             {includedCountAnalyses.map(analysis => (
             <div key={analysis.sectionId} className="p-4 border border-slate-200 rounded-lg">
@@ -854,6 +854,50 @@ export default function ReportDetailsPage() {
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Reports List
         </Button>
         <div className="flex gap-2">
+           <Dialog>
+             <DialogTrigger asChild>
+                <Button variant="secondary">
+                    <ListOrdered className="mr-2 h-4 w-4" />
+                    View All Responses
+                </Button>
+             </DialogTrigger>
+             <DialogContent className="max-w-2xl">
+                 <DialogHeader>
+                    <DialogTitle>All Submitted Answers</DialogTitle>
+                    <DialogDescription>A complete list of all questions and the answers provided by the user.</DialogDescription>
+                 </DialogHeader>
+                 <ScrollArea className="h-[60vh] pr-6">
+                    <div className="space-y-6">
+                        {questionnaire.sections.map((section, sIdx) => (
+                            <div key={section.id}>
+                                <h3 className="text-lg font-semibold text-primary border-b pb-2 mb-3">
+                                    Section {sIdx + 1}: {section.name}
+                                </h3>
+                                <div className="space-y-4">
+                                    {section.questions.map((question, qIdx) => {
+                                        const selectedOptionId = response.responses[question.id];
+                                        const selectedOption = question.options.find(opt => opt.id === selectedOptionId);
+                                        return (
+                                            <div key={question.id} className="text-sm">
+                                                <p className="font-medium">{qIdx + 1}. {question.question}</p>
+                                                <p className="text-muted-foreground pl-4">
+                                                    &rarr; <span className="italic">{selectedOption?.text ?? "Not answered"}</span>
+                                                </p>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                 </ScrollArea>
+                 <DialogFooter>
+                    <Button variant="outline" asChild>
+                        <DialogTrigger>Close</DialogTrigger>
+                    </Button>
+                 </DialogFooter>
+             </DialogContent>
+           </Dialog>
           <Button onClick={handleExportToDocx} disabled={isDownloading}>
             {isDownloading ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

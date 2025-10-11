@@ -80,21 +80,22 @@ function AdminLayoutInner({ children, user, handleLogout }: { children: React.Re
             <SidebarMenu className="px-2">
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
-                  <Link href={item.href} asChild>
-                    <SidebarMenuButton
-                      isActive={pathname === item.href || (item.subItems && pathname.startsWith(item.href)) || (item.href === "/admin/settings" && pathname.startsWith("/admin/settings"))}
-                      tooltip={item.label}
-                      className="justify-start"
-                    >
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === item.href || (item.subItems && pathname.startsWith(item.href)) || (item.href === "/admin/settings" && pathname.startsWith("/admin/settings"))}
+                    tooltip={item.label}
+                    className="justify-start"
+                  >
+                    <Link href={item.href}>
                       <item.icon className="w-5 h-5" />
                       <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
-                    </SidebarMenuButton>
-                  </Link>
+                    </Link>
+                  </SidebarMenuButton>
                   {item.subItems && (pathname.startsWith(item.href) || pathname === item.href ) && (
                      <ul className="pl-7 pt-1 space-y-1 group-data-[collapsible=icon]:hidden">
                        {item.subItems.map(subItem => (
                          <li key={subItem.href}>
-                           <Link href={subItem.href} asChild>
+                           <Link href={subItem.href} passHref>
                              <SidebarMenuButton
                                 size="sm"
                                 isActive={pathname === subItem.href}
@@ -125,7 +126,7 @@ function AdminLayoutInner({ children, user, handleLogout }: { children: React.Re
               <p className="text-xs text-muted-foreground">Administrator</p>
             </div>
           </div>
-          <Link href="/" asChild>
+          <Link href="/" passHref>
             <SidebarMenuButton tooltip="Back to Site Home" className="mt-2 justify-start">
                 <Home className="w-5 h-5" />
                 <span className="group-data-[collapsible=icon]:hidden">Back to Home</span>

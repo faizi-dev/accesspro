@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from 'react';
@@ -25,7 +26,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Label as RechartsLabel,
 } from 'recharts';
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table as DocxTable, TableRow as DocxTableRow, TableCell as DocxTableCell, WidthType, ImageRun, AlignmentType, ShadingType } from 'docx';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table as DocxTable, TableRow as DocxTableRow, TableCell as DocxTableCell, WidthType, ImageRun, AlignmentType, ShadingType, ExternalHyperlink } from 'docx';
 import { saveAs } from 'file-saver';
 import html2canvas from 'html2canvas';
 
@@ -401,8 +402,8 @@ export default function ReportDetailsPage() {
     setIsDownloading(true);
 
     const includedSectionIds = Object.keys(selectedSections).filter(id => selectedSections[id]);
-    if (includedSectionIds.length === 0) {
-        toast({ variant: 'destructive', title: 'No Sections Selected', description: 'Please select at least one section to include in the export.' });
+    if (includedSectionIds.length === 0 && (!response.attachments || response.attachments.length === 0)) {
+        toast({ variant: 'destructive', title: 'No Content Selected', description: 'Please select at least one section or have attachments to include in the export.' });
         setIsDownloading(false);
         return;
     }
@@ -415,7 +416,7 @@ export default function ReportDetailsPage() {
     const shouldIncludeMatrix = matrixAnalysis && selectedSections[matrixAnalysis.xSectionId] && selectedSections[matrixAnalysis.ySectionId];
 
     try {
-        let thermometerImageBuffer: Buffer | undefined;
+        let thermometerImageBuffer: ArrayBuffer | undefined;
         if (reportData.barScores.length > 0) {
             const { image: thermometerImageSrc } = getThermometerInfo(
                 reportData.totalAverageRanking,
@@ -424,40 +425,46 @@ export default function ReportDetailsPage() {
             if (thermometerImageSrc) {
                 const imageUrl = `${window.location.origin}${thermometerImageSrc}`;
                 const imageBlob = await (await fetch(imageUrl)).blob();
-                thermometerImageBuffer = Buffer.from(await imageBlob.arrayBuffer());
+                thermometerImageBuffer = await imageBlob.arrayBuffer();
             }
         }
 
-        let barChartImageBuffer: Buffer | undefined;
+        let barChartImageBuffer: ArrayBuffer | undefined;
         if (barChartExportRef.current && includedBarScores.length > 0) {
             const canvas = await html2canvas(barChartExportRef.current, { backgroundColor: '#FFFFFF', scale: 2 });
             const imageDataUrl = canvas.toDataURL('image/png');
             barChartImageBuffer = Buffer.from(imageDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
         }
         
-        let matrixChartImageBuffer: Buffer | undefined;
+        let matrixChartImageBuffer: ArrayBuffer | undefined;
         if (matrixChartRef.current && shouldIncludeMatrix) {
             const canvas = await html2canvas(matrixChartRef.current, { backgroundColor: '#FFFFFF', scale: 2 });
             const imageDataUrl = canvas.toDataURL('image/png');
             matrixChartImageBuffer = Buffer.from(imageDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
         }
         
-        let countAnalysisImageBuffer: Buffer | undefined;
+        let countAnalysisImageBuffer: ArrayBuffer | undefined;
         if (countAnalysisExportRef.current && includedCountAnalyses.length > 0) {
             const canvas = await html2canvas(countAnalysisExportRef.current, { backgroundColor: '#FFFFFF', scale: 2 });
             const imageDataUrl = canvas.toDataURL('image/png');
             countAnalysisImageBuffer = Buffer.from(imageDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
         }
-        
-        const createHeading = (text: string, level: HeadingLevel = HeadingLevel.HEADING_2) => new Paragraph({
-            text,
-            heading: level,
-            spacing: { before: 240, after: 120 },
-        });
 
-        const docSections: (Paragraph | DocxTable | undefined)[] = [];
+        const fetchImageAsBuffer = async (url: string) => {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) return null;
+                const blob = await response.blob();
+                return await blob.arrayBuffer();
+            } catch (e) {
+                console.error("Failed to fetch image for DOCX:", e);
+                return null;
+            }
+        };
 
-        docSections.push(new Paragraph({
+        const docChildren: (Paragraph | DocxTable | undefined)[] = [];
+
+        docChildren.push(new Paragraph({
             text: "Executive Summary",
             heading: HeadingLevel.HEADING_1,
             alignment: AlignmentType.CENTER,
@@ -469,15 +476,14 @@ export default function ReportDetailsPage() {
             spacing: { after: 60 }
         });
 
-        docSections.push(createHeaderLine(`Report for: ${response.customerName || 'N/A'}`));
-        docSections.push(createHeaderLine(`Questionnaire: ${response.questionnaireVersionName}`));
-        docSections.push(createHeaderLine(`Submitted: ${format(response.submittedAt, 'PPP p')}`));
-        docSections.push(new Paragraph({ text: '', spacing: { after: 240 } }));
+        docChildren.push(createHeaderLine(`Report for: ${response.customerName || 'N/A'}`));
+        docChildren.push(createHeaderLine(`Questionnaire: ${response.questionnaireVersionName}`));
+        docChildren.push(createHeaderLine(`Submitted: ${format(response.submittedAt, 'PPP p')}`));
+        docChildren.push(new Paragraph({ text: '', spacing: { after: 240 } }));
 
 
         if (reportData.barScores.length > 0 && thermometerImageBuffer) {
-             docSections.push(createHeading('Total Average Ranking'));
-             docSections.push(new Paragraph({
+             docChildren.push(new Paragraph({
                 children: [
                     new ImageRun({
                         data: thermometerImageBuffer,
@@ -488,7 +494,7 @@ export default function ReportDetailsPage() {
              }));
 
             const { text: scoreText } = getThermometerInfo(reportData.totalAverageRanking, questionnaire.report_total_average);
-            docSections.push(new Paragraph({
+            docChildren.push(new Paragraph({
                  children: [
                     new TextRun({
                         text: `Total Average: ${reportData.totalAverageRanking.toFixed(2)} : ${scoreText}`,
@@ -503,7 +509,7 @@ export default function ReportDetailsPage() {
         }
         
         if (includedBarScores.length > 0 && barChartImageBuffer) {
-            docSections.push(new Paragraph({
+            docChildren.push(new Paragraph({
                 children: [
                     new ImageRun({
                         data: barChartImageBuffer,
@@ -516,13 +522,19 @@ export default function ReportDetailsPage() {
                 alignment: AlignmentType.CENTER
             }));
         }
+        
+        const createHeading = (text: string, level: HeadingLevel = HeadingLevel.HEADING_2) => new Paragraph({
+            text,
+            heading: level,
+            spacing: { before: 240, after: 120 },
+        });
 
         if (shouldIncludeMatrix && matrixChartImageBuffer) {
-            docSections.push(createHeading('Double-Entry Matrix Analysis'));
+            docChildren.push(createHeading('Double-Entry Matrix Analysis'));
             if(matrixAnalysis.analysisText) {
-                docSections.push(new Paragraph({ text: matrixAnalysis.analysisText, alignment: AlignmentType.CENTER, bold: true, color: "5DADE2", spacing: { after: 120 } }));
+                docChildren.push(new Paragraph({ text: matrixAnalysis.analysisText, alignment: AlignmentType.CENTER, bold: true, color: "5DADE2", spacing: { after: 120 } }));
             }
-            docSections.push(new Paragraph({
+            docChildren.push(new Paragraph({
                 children: [
                     new ImageRun({
                         data: matrixChartImageBuffer,
@@ -537,14 +549,14 @@ export default function ReportDetailsPage() {
         }
 
         if (includedCountAnalyses.length > 0) {
-            docSections.push(createHeading('Response Count Analysis'));
+            docChildren.push(createHeading('Response Count Analysis'));
             includedCountAnalyses.forEach(analysis => {
                 if(analysis.analysisText) {
-                    docSections.push(new Paragraph({ text: `${analysis.sectionName}: ${analysis.analysisText}`, alignment: AlignmentType.CENTER, bold: true, color: "5DADE2", spacing: { after: 120 } }));
+                    docChildren.push(new Paragraph({ text: `${analysis.sectionName}: ${analysis.analysisText}`, alignment: AlignmentType.CENTER, bold: true, color: "5DADE2", spacing: { after: 120 } }));
                 }
             });
             if (countAnalysisImageBuffer) {
-              docSections.push(new Paragraph({
+              docChildren.push(new Paragraph({
                   children: [
                       new ImageRun({
                           data: countAnalysisImageBuffer,
@@ -558,20 +570,60 @@ export default function ReportDetailsPage() {
               }));
             }
         }
+        
+        // Attachment section in Word doc
+        if (response.attachments && response.attachments.length > 0) {
+            docChildren.push(createHeading('Uploaded Attachments'));
 
-        docSections.push(createHeading('Summary & Comments'));
-        docSections.push(new Paragraph({ 
+            for (const file of response.attachments) {
+                if (file.type.startsWith('image/')) {
+                    const imageBuffer = await fetchImageAsBuffer(file.url);
+                    if (imageBuffer) {
+                        docChildren.push(new Paragraph({ text: file.name, style: "IntenseQuote" }));
+                        docChildren.push(new Paragraph({
+                            children: [
+                                new ImageRun({
+                                    data: imageBuffer,
+                                    transformation: { width: 400, height: 300 }, // Adjust size as needed
+                                }),
+                            ],
+                            spacing: { after: 120 }
+                        }));
+                    }
+                } else {
+                    // For non-image files, add a hyperlink
+                    docChildren.push(new Paragraph({
+                        children: [
+                            new TextRun("File: "),
+                            new ExternalHyperlink({
+                                children: [
+                                    new TextRun({
+                                        text: file.name,
+                                        style: "Hyperlink",
+                                    }),
+                                ],
+                                link: file.url,
+                            }),
+                        ],
+                         spacing: { after: 120 }
+                    }));
+                }
+            }
+        }
+
+        docChildren.push(createHeading('Summary & Comments'));
+        docChildren.push(new Paragraph({ 
             text: "Admin Comments",
             bold: true,
             spacing: { after: 60 }
         }));
-        docSections.push(new Paragraph({ text: response.adminComments?.executiveSummary || "No executive summary comments added yet." }));
+        docChildren.push(new Paragraph({ text: response.adminComments?.executiveSummary || "No executive summary comments added yet." }));
 
         // --- Detailed Section Pages ---
         const barSectionsForExport = includedSections.filter(s => s.type === 'bar');
 
         if (barSectionsForExport.length > 0) {
-            docSections.push(new Paragraph({
+            docChildren.push(new Paragraph({
                 text: "ALLEGATO 1: ANALISI DI DETTAGLIO DI OGNI AREA",
                 heading: HeadingLevel.HEADING_1,
                 alignment: AlignmentType.CENTER,
@@ -581,9 +633,9 @@ export default function ReportDetailsPage() {
         }
 
         for (const section of barSectionsForExport) {
-            docSections.push(createHeading(section.name, HeadingLevel.HEADING_2));
+            docChildren.push(createHeading(section.name, HeadingLevel.HEADING_2));
             if (section.description) {
-                docSections.push(new Paragraph({ text: section.description, style: "TOC1" }));
+                docChildren.push(new Paragraph({ text: section.description, style: "TOC1" }));
             }
 
             // Find calculated score for this section
@@ -591,7 +643,7 @@ export default function ReportDetailsPage() {
             const sectionAverageScore = calculatedScoreData?.averageScore || 0;
             const analysisText = calculatedScoreData?.analysisText || "";
             
-            docSections.push(new Paragraph({
+            docChildren.push(new Paragraph({
                 children: [
                     new TextRun({ text: "Area Average Score: ", bold: true }),
                     new TextRun({ text: sectionAverageScore.toFixed(2), bold: true, color: "5DADE2" })
@@ -600,25 +652,25 @@ export default function ReportDetailsPage() {
             }));
 
             if(analysisText) {
-                docSections.push(new Paragraph({
+                docChildren.push(new Paragraph({
                     children: [ new TextRun({ text: analysisText, bold: true, color: getScoreHexColor(sectionAverageScore) }) ],
                     spacing: { after: 240 },
                     alignment: AlignmentType.CENTER
                 }));
             }
 
-            docSections.push(createHeading("Question Breakdown", HeadingLevel.HEADING_3));
+            docChildren.push(createHeading("Question Breakdown", HeadingLevel.HEADING_3));
 
             for (const question of section.questions) {
                 const selectedOptionId = response.responses[question.id];
                 const selectedOption = question.options.find(opt => opt.id === selectedOptionId);
                 const score = selectedOption?.score ?? 0;
 
-                docSections.push(new Paragraph({
+                docChildren.push(new Paragraph({
                     children: [new TextRun({ text: question.question, bold: true })],
                     spacing: { after: 60 }
                 }));
-                docSections.push(new Paragraph({
+                docChildren.push(new Paragraph({
                     children: [new TextRun({ text: `Answer: `, italics: true }), new TextRun({ text: selectedOption?.text ?? "Not answered" })],
                     spacing: { after: 120 }
                 }));
@@ -683,34 +735,49 @@ export default function ReportDetailsPage() {
                     ],
                 });
 
-                docSections.push(layoutTable);
+                docChildren.push(layoutTable);
                 
-                docSections.push(new Paragraph({
+                docChildren.push(new Paragraph({
                     text: "",
                     border: { bottom: { color: "auto", space: 1, value: "single", size: 6 } },
                     spacing: { after: 240, before: 240 }
                 }));
             }
 
-            docSections.push(createHeading("Analysis & Comments", HeadingLevel.HEADING_3));
+            docChildren.push(createHeading("Analysis & Comments", HeadingLevel.HEADING_3));
             
             const dynamicComment = response.dynamicComments?.[section.id] ?? section.comment ?? "No dynamic analysis for this section.";
-            docSections.push(new Paragraph({ text: "Dynamic Analysis", bold: true, spacing: { after: 60 } }));
-            docSections.push(new Paragraph({ text: dynamicComment, spacing: { after: 120 } }));
+            docChildren.push(new Paragraph({ text: "Dynamic Analysis", bold: true, spacing: { after: 60 } }));
+            docChildren.push(new Paragraph({ text: dynamicComment, spacing: { after: 120 } }));
 
             const adminComment = response.adminComments?.[section.id] ?? "No admin comments added for this section yet.";
-            docSections.push(new Paragraph({ text: "Admin Comments", bold: true, spacing: { after: 60 } }));
-            docSections.push(new Paragraph({ text: adminComment, spacing: { after: 240 } }));
+            docChildren.push(new Paragraph({ text: "Admin Comments", bold: true, spacing: { after: 60 } }));
+            docChildren.push(new Paragraph({ text: adminComment, spacing: { after: 240 } }));
 
             // Add page break after each detailed section except the last one
             if (section !== barSectionsForExport[barSectionsForExport.length - 1]) {
-                docSections.push(new Paragraph({ pageBreakBefore: true }));
+                docChildren.push(new Paragraph({ pageBreakBefore: true }));
             }
         }
 
         const doc = new Document({
+            styles: {
+                paragraphStyles: [
+                    {
+                        id: "IntenseQuote",
+                        name: "Intense Quote",
+                        basedOn: "Normal",
+                        next: "Normal",
+                        quickFormat: true,
+                        run: {
+                            italics: true,
+                            color: "76923C",
+                        },
+                    },
+                ],
+            },
             sections: [{
-                children: docSections.filter((s): s is Paragraph | DocxTable => !!s)
+                children: docChildren.filter((s): s is Paragraph | DocxTable => !!s)
             }],
         });
 

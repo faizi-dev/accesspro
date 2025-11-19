@@ -5,15 +5,17 @@ import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { db } from '@/lib/firebase/config';
 import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
-import type { QuestionnaireUploadData, Section } from '@/lib/types';
+import type { QuestionnaireUploadData, Section, AttachmentConfig } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { UploadCloud, FileJson, Wand2 } from 'lucide-react';
+import { UploadCloud, FileJson, Wand2, Paperclip } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // Helper to generate a slug-like ID
 const generateSlug = (text: string) => {
@@ -33,6 +35,7 @@ export default function UploadQuestionnairePage() {
   const [versionName, setVersionName] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [jsonContent, setJsonContent] = useState('');
+  const [attachmentConfig, setAttachmentConfig] = useState<AttachmentConfig>({ required: false, count: 2 });
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -49,6 +52,9 @@ export default function UploadQuestionnairePage() {
             const parsed = JSON.parse(content) as QuestionnaireUploadData; // Use the type
             if (parsed.versionName && !versionName) { // Auto-fill version name if empty
                 setVersionName(parsed.versionName);
+            }
+            if (parsed.attachmentConfig) {
+                setAttachmentConfig(parsed.attachmentConfig);
             }
           } catch (err) {
             toast({ variant: "destructive", title: "Invalid JSON", description: "The file is not valid JSON." });
@@ -159,11 +165,14 @@ export default function UploadQuestionnairePage() {
 
       const newVersionId = generateSlug(versionName) || `v-${Date.now()}`;
 
+      const finalAttachmentConfig = questionnaireData.attachmentConfig ? questionnaireData.attachmentConfig : attachmentConfig;
+
       const versionDoc = {
         name: versionName, // This is the overall questionnaire version name
         description: questionnaireData.description || null,
         report_total_average: questionnaireData.report_total_average || null,
         sections: processedSections,
+        attachmentConfig: finalAttachmentConfig.required ? finalAttachmentConfig : { required: false, count: 0 },
         isActive: false,
         createdAt: serverTimestamp(),
       };
@@ -177,6 +186,7 @@ export default function UploadQuestionnairePage() {
       setVersionName('');
       setFile(null);
       setJsonContent('');
+      setAttachmentConfig({ required: false, count: 2 });
     } catch (error: any) {
       console.error("Error uploading questionnaire: ", error);
       toast({
@@ -190,10 +200,14 @@ export default function UploadQuestionnairePage() {
   };
   
   const sampleJson = `{
-  "versionName": "Dynamic Assessment V8",
+  "versionName": "Dynamic Assessment V9",
   "description": {
     "header": "Welcome to Your Assessment",
     "details": "This assessment is designed to provide insights into key areas of your operations. It consists of multiple sections with closed-ended questions.\\n\\nPlease choose the response that best reflects your current situation. The estimated time for completion is around 50 minutes. You can save your progress at any time and resume later using the same link.\\n\\nIf a question is unclear, use the 'Need help answering?' button for additional context."
+  },
+  "attachmentConfig": {
+    "required": true,
+    "count": 2
   },
   "report_total_average": {
     "green": "Body Healthy",
@@ -313,7 +327,7 @@ export default function UploadQuestionnairePage() {
             <CardTitle className="text-2xl font-headline">Upload New Questionnaire Version</CardTitle>
         </div>
         <CardDescription>
-          Provide a version name, then upload or paste a JSON file. An optional `description` object with a `header` and `details` can be added for an intro screen. Each section must have a `name` and `type` ('bar', 'matrix', 'count'). `bar` sections need `total_score`. `matrix` sections need `matrix_axis` ('x' or 'y').
+          Provide a version name, then upload or paste a JSON file. Configure attachment requirements as needed. An optional `description` object with a `header` and `details` can be added for an intro screen. Each section must have a `name` and `type` ('bar', 'matrix', 'count'). `bar` sections need `total_score`. `matrix` sections need `matrix_axis` ('x' or 'y').
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -330,6 +344,43 @@ export default function UploadQuestionnairePage() {
               className="mt-1"
             />
           </div>
+
+          <Card className="p-4 bg-secondary/20">
+            <CardHeader className="p-0 pb-4">
+                <div className="flex items-center gap-2">
+                    <Paperclip className="w-5 h-5 text-primary" />
+                    <CardTitle className="text-lg">Attachment Settings</CardTitle>
+                </div>
+            </CardHeader>
+            <CardContent className="p-0 space-y-4">
+                <div className="flex items-center space-x-2">
+                    <Switch 
+                        id="attachments-required"
+                        checked={attachmentConfig.required} 
+                        onCheckedChange={(checked) => setAttachmentConfig(prev => ({ ...prev, required: checked }))}
+                    />
+                    <Label htmlFor="attachments-required">Require File Attachments</Label>
+                </div>
+                {attachmentConfig.required && (
+                    <div className="space-y-2 pl-2">
+                        <Label htmlFor="attachment-count">Number of required attachments</Label>
+                         <Select 
+                            value={String(attachmentConfig.count)} 
+                            onValueChange={(value) => setAttachmentConfig(prev => ({ ...prev, count: Number(value) }))}
+                         >
+                            <SelectTrigger id="attachment-count" className="w-[180px]">
+                                <SelectValue placeholder="Select number" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="2">2 Files</SelectItem>
+                                <SelectItem value="3">3 Files</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
+            </CardContent>
+          </Card>
+
 
           <div>
             <Label htmlFor="jsonFile" className="text-base">Upload JSON File</Label>

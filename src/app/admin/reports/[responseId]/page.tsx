@@ -6,10 +6,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { db } from '@/lib/firebase/config';
 import { doc, getDoc, Timestamp, updateDoc } from 'firebase/firestore';
-import type { AreaScoreText, CustomerResponse, QuestionnaireVersion, Section as SectionType, ReportTotalAverage, CalculatedSectionScore, CalculatedCountAnalysis, CalculatedMatrixAnalysis } from '@/lib/types';
+import type { AttachmentFile, AreaScoreText, CustomerResponse, QuestionnaireVersion, Section as SectionType, ReportTotalAverage, CalculatedSectionScore, CalculatedCountAnalysis, CalculatedMatrixAnalysis } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, FileText, AlertCircle, Edit, Star, Download, Loader2, MessageSquareQuote, ListOrdered } from 'lucide-react';
+import { ArrowLeft, FileText, AlertCircle, Edit, Star, Download, Loader2, MessageSquareQuote, ListOrdered, Paperclip } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -88,10 +88,8 @@ const getThermometerInfo = (score: number, scoreLabels: ReportTotalAverage = def
     if (score > 2.5 && score <= 3.5) {
         return { image: '/yellow_thermometer.png', text: scoreLabels.yellow, color: 'text-yellow-500' };
     }
-    if (score > 3.5) {
-        return { image: '/green_thermometer.png', text: scoreLabels.green, color: 'text-green-600' };
-    }
-    return { image: '', text: '', color: 'text-muted-foreground' };
+    // score > 3.5
+    return { image: '/green_thermometer.png', text: scoreLabels.green, color: 'text-green-600' };
 };
 
 
@@ -837,7 +835,6 @@ export default function ReportDetailsPage() {
       {/* Hidden containers for DOCX export */}
       <div className="absolute -left-[9999px] top-auto w-[800px] bg-white text-black p-4">
         <div ref={barChartExportRef} className="space-y-4 p-8">
-            <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Weighted Area Scores</h2>
             <div className="space-y-4 pt-2">
                 {sortedIncludedBarScores.map((area) => (
                 <div key={area.sectionId} className="grid grid-cols-12 items-start gap-2 border-b pb-4 last:border-b-0 last:pb-0 px-4">
@@ -1074,6 +1071,42 @@ export default function ReportDetailsPage() {
           </Card>
         </section>
       )}
+
+      {/* --- ATTACHMENTS --- */}
+      {response.attachments && response.attachments.length > 0 && (
+        <section>
+          <Separator className="my-6" />
+          <h2 className="text-2xl font-semibold mb-4 text-primary text-center">Uploaded Attachments</h2>
+          <Card>
+            <CardHeader>
+              <CardTitle>Submitted Files</CardTitle>
+              <CardDescription>Files uploaded by the user during the assessment.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-3">
+                {response.attachments.map((file, index) => (
+                  <li key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Paperclip className="h-5 w-5 text-primary" />
+                      <div className="flex flex-col">
+                        <span className="font-medium">{file.name}</span>
+                        <span className="text-sm text-muted-foreground">
+                          {file.type} - {(file.size / 1024).toFixed(2)} KB
+                        </span>
+                      </div>
+                    </div>
+                    <a href={file.url} target="_blank" rel="noopener noreferrer">
+                      <Button variant="outline" size="sm">
+                        <Download className="mr-2 h-4 w-4" /> Download
+                      </Button>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        </section>
+      )}
       
       {/* --- MATRIX ANALYSIS --- */}
       {matrixAnalysis && (
@@ -1262,5 +1295,3 @@ export default function ReportDetailsPage() {
     </div>
   );
 }
-
-    

@@ -2,14 +2,14 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import type { QuestionnaireVersion, Section, Question as QuestionType, AnswerOption, CustomerLink, EmailTemplate } from '@/lib/types';
+import type { QuestionnaireVersion, Section, Question as QuestionType, AnswerOption, CustomerLink, EmailTemplate, AttachmentFile } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, Save, Send, ChevronLeft, ChevronRight, Info, ChevronUp, ChevronDown, PlayCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, Save, Send, ChevronLeft, ChevronRight, Info, ChevronUp, ChevronDown, PlayCircle, Paperclip, UploadCloud, File, Trash2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import {
@@ -24,6 +24,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { updateDoc, doc, serverTimestamp, setDoc, getDoc } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db } from '@/lib/firebase/config';
 
 interface QuestionnaireClientProps {
@@ -39,8 +40,17 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
   const [isLoading, setIsLoading] = useState(false);
   const [openAdditionalText, setOpenAdditionalText] = useState<Record<string, boolean>>({});
   const [showIntro, setShowIntro] = useState(customerLink.status === 'pending' && !!questionnaire.description);
+  
+  const [files, setFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<AttachmentFile[]>([]);
+
   const { toast } = useToast();
   const router = useRouter();
+
+  const totalSteps = questionnaire.sections.length + (questionnaire.attachmentConfig?.required ? 1 : 0);
+  const isAttachmentStep = questionnaire.attachmentConfig?.required && currentSectionIndex === questionnaire.sections.length;
+  const currentStep = isAttachmentStep ? totalSteps : currentSectionIndex + 1;
 
   const currentSection = questionnaire.sections[currentSectionIndex];
   
@@ -62,13 +72,24 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
   };
 
   const handleNextSection = async () => {
+    if (isAttachmentStep) {
+        // This button won't be shown on attachment step, but as a safeguard.
+        return;
+    }
     if (!areAllQuestionsAnswered()) {
       toast({ variant: "destructive", title: "Incomplete Section", description: "Please answer all questions before proceeding." });
       return;
     }
-    if (currentSectionIndex < questionnaire.sections.length - 1) {
+    if (currentSectionIndex < questionnaire.sections.length) {
       setCurrentSectionIndex(prev => prev + 1);
       await saveProgress(currentSectionIndex + 1, false); // false = don't redirect
+    }
+  };
+
+  const handlePreviousSection = async () => {
+    if (currentSectionIndex > 0) {
+        setCurrentSectionIndex(prev => prev - 1);
+        await saveProgress(currentSectionIndex - 1, false);
     }
   };
 
@@ -91,7 +112,7 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
       if (shouldRedirect) {
         router.push(`/assessment/${linkId}/saved`);
       } else if (!showIntro) { // Only toast if not on intro screen
-        toast({ title: "Progress Saved", description: "Your answers for this section have been saved." });
+        toast({ title: "Progress Saved", description: "Your answers have been saved." });
       }
 
     } catch (error) {
@@ -101,12 +122,68 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
       setIsLoading(false);
     }
   };
+  
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files) {
+      const selectedFiles = Array.from(event.target.files);
+      setFiles(prevFiles => [...prevFiles, ...selectedFiles]);
+    }
+  };
+
+  const removeFile = (fileToRemove: File) => {
+    setFiles(prevFiles => prevFiles.filter(file => file !== fileToRemove));
+  };
+  
+  const handleFileUpload = async (): Promise<AttachmentFile[]> => {
+    if (files.length === 0) return [];
+    
+    setIsUploading(true);
+    const storage = getStorage();
+    const uploadedFilePromises = files.map(async (file) => {
+        const storageRef = ref(storage, `attachments/${linkId}/${file.name}`);
+        const snapshot = await uploadBytes(storageRef, file);
+        const downloadURL = await getDownloadURL(snapshot.ref);
+        return {
+            name: file.name,
+            url: downloadURL,
+            size: file.size,
+            type: file.type,
+        };
+    });
+
+    try {
+        const results = await Promise.all(uploadedFilePromises);
+        setUploadedFiles(results);
+        toast({ title: "Upload Complete", description: `${results.length} files uploaded successfully.` });
+        return results;
+    } catch (error) {
+        console.error("Error uploading files:", error);
+        toast({ variant: "destructive", title: "Upload Failed", description: "Could not upload files." });
+        return [];
+    } finally {
+        setIsUploading(false);
+    }
+  };
+
 
   const handleSubmit = async () => {
-    if (!areAllQuestionsAnswered() && currentSectionIndex === questionnaire.sections.length -1 ) {
+    let finalAttachments: AttachmentFile[] = [];
+    
+    if (questionnaire.attachmentConfig?.required) {
+        if (files.length !== questionnaire.attachmentConfig.count) {
+             toast({ variant: "destructive", title: "Attachments Missing", description: `Please upload exactly ${questionnaire.attachmentConfig.count} files.` });
+             return;
+        }
+        finalAttachments = await handleFileUpload();
+        if (finalAttachments.length !== questionnaire.attachmentConfig.count) {
+             toast({ variant: "destructive", title: "Upload Failed", description: "File upload failed. Please try again." });
+             return;
+        }
+    } else if (isAttachmentStep && !areAllQuestionsAnswered()) {
        toast({ variant: "destructive", title: "Incomplete Final Section", description: "Please answer all questions in this final section." });
        return;
     }
+    
     setIsLoading(true);
     try {
       // Fetch the original customerLink to get customerName and customerEmail
@@ -124,17 +201,18 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
         }
       });
 
-      const responseDocData = {
+      const responseDocData: Omit<CustomerResponse, 'id'> = {
         linkId: linkId,
         customerId: customerLink.customerId,
         customerName: fetchedCustomerLinkData.customerName || customerLink.customerName || "N/A",
         customerEmail: fetchedCustomerLinkData.customerEmail || customerLink.customerEmail || "N/A",
         questionnaireVersionId: questionnaire.id,
-        questionnaireVersionName: questionnaire.name, // Denormalized from the current questionnaire version
-        submittedAt: serverTimestamp(),
+        questionnaireVersionName: questionnaire.name,
+        submittedAt: serverTimestamp() as any, // Cast for RTK query, will be server timestamp
         responses: answers,
-        dynamicComments: dynamicComments, // Initialize dynamic comments
-        adminComments: {}, // Initialize adminComments
+        attachments: finalAttachments,
+        dynamicComments: dynamicComments,
+        adminComments: {},
       };
       
       await setDoc(doc(db, 'customerResponses', linkId), responseDocData);
@@ -184,7 +262,7 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
     }
   };
 
-  const progressPercentage = ((currentSectionIndex + 1) / questionnaire.sections.length) * 100;
+  const progressPercentage = (currentStep / totalSteps) * 100;
 
   if (showIntro && questionnaire.description) {
     return (
@@ -204,20 +282,73 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
     );
   }
 
-
   return (
     <div className="max-w-3xl mx-auto py-8 px-4 space-y-8">
       <Card className="shadow-xl animate-subtle-slide-in" style={{animationDelay: '0.1s'}}>
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle className="text-2xl font-headline text-primary">{questionnaire.name}</CardTitle>
-            <Badge variant="outline">Section {currentSectionIndex + 1} of {questionnaire.sections.length}</Badge>
+            <Badge variant="outline">Step {currentStep} of {totalSteps}</Badge>
           </div>
           <Progress value={progressPercentage} className="w-full mt-2" />
         </CardHeader>
       </Card>
+      
+      {isAttachmentStep ? (
+        <Card className="shadow-xl animate-subtle-slide-in" style={{animationDelay: '0.3s'}}>
+            <CardHeader>
+                <div className="flex items-center gap-2">
+                    <Paperclip className="h-6 w-6 text-primary"/>
+                    <CardTitle className="text-xl font-semibold">Upload Required Attachments</CardTitle>
+                </div>
+                <CardDescription>
+                    Please upload exactly {questionnaire.attachmentConfig?.count} document(s) to complete your submission.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div className="p-6 border-2 border-dashed rounded-lg text-center">
+                    <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
+                    <h3 className="mt-2 text-sm font-medium text-foreground">
+                        Drag and drop files here, or click to select files
+                    </h3>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                        Supports PDF, DOCX, PNG, JPG, etc.
+                    </p>
+                    <Input
+                        id="file-upload"
+                        type="file"
+                        multiple
+                        className="sr-only"
+                        onChange={handleFileChange}
+                        disabled={isUploading}
+                    />
+                    <Label htmlFor="file-upload" className="mt-4 inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-primary/90 cursor-pointer">
+                        Select Files
+                    </Label>
+                </div>
 
-      {currentSection && (
+                {files.length > 0 && (
+                    <div className="space-y-2">
+                        <h4 className="font-medium">Selected files ({files.length} of {questionnaire.attachmentConfig?.count}):</h4>
+                        <ul className="space-y-2">
+                            {files.map((file, index) => (
+                                <li key={index} className="flex items-center justify-between p-2 border rounded-md bg-secondary/30">
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <File className="h-4 w-4 text-muted-foreground" />
+                                        <span className="font-medium">{file.name}</span>
+                                        <span className="text-muted-foreground">({(file.size / 1024).toFixed(1)} KB)</span>
+                                    </div>
+                                    <Button variant="ghost" size="icon" onClick={() => removeFile(file)} disabled={isUploading}>
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+      ) : currentSection && (
         <Card key={currentSection.id} className="shadow-xl animate-subtle-slide-in" style={{animationDelay: '0.3s'}}>
           <CardHeader>
             <CardTitle className="text-xl font-semibold">{currentSectionIndex + 1}. {currentSection.name}</CardTitle>
@@ -278,41 +409,43 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
       )}
 
       <div className="flex justify-between items-center mt-8 animate-subtle-slide-in" style={{animationDelay: '0.5s'}}>
-        <Button variant="outline" onClick={() => saveProgress()} disabled={isLoading}>
+        <Button variant="outline" onClick={() => saveProgress()} disabled={isLoading || isUploading}>
           <Save className="mr-2 h-4 w-4" /> Save and Quit
         </Button>
         <div className="space-x-3">
-          <Button variant="ghost" disabled={true}> 
+          <Button variant="ghost" onClick={handlePreviousSection} disabled={isLoading || isUploading || currentSectionIndex === 0}> 
             <ChevronLeft className="mr-2 h-4 w-4" /> Previous
           </Button>
-
-          {currentSectionIndex < questionnaire.sections.length - 1 ? (
-            <Button onClick={handleNextSection} disabled={isLoading || !areAllQuestionsAnswered()} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              Next Section <ChevronRight className="ml-2 h-4 w-4" />
+          
+          {!isAttachmentStep ? (
+            <Button onClick={handleNextSection} disabled={isLoading || isUploading || !areAllQuestionsAnswered()} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+              Next Step <ChevronRight className="ml-2 h-4 w-4" />
             </Button>
           ) : (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button disabled={isLoading || !areAllQuestionsAnswered()} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                  <Send className="mr-2 h-4 w-4" /> Submit Questionnaire
+                <Button disabled={isLoading || isUploading || files.length !== questionnaire.attachmentConfig?.count} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                   {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4" />}
+                   {isUploading ? "Uploading..." : "Submit Questionnaire"}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Confirm Submission</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to submit your answers? You will not be able to make changes after submission.
+                    Are you sure you want to submit your answers and attachments? You will not be able to make changes after submission.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleSubmit} disabled={isLoading} className="bg-accent hover:bg-accent/90">
-                    {isLoading ? 'Submitting...' : 'Yes, Submit'}
+                  <AlertDialogAction onClick={handleSubmit} disabled={isLoading || isUploading} className="bg-accent hover:bg-accent/90">
+                    {isLoading || isUploading ? 'Submitting...' : 'Yes, Submit'}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
           )}
+
         </div>
       </div>
     </div>

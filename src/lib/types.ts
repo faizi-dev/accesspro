@@ -55,6 +55,11 @@ export interface ReportTotalAverage {
   red: string;
 }
 
+export interface AttachmentConfig {
+  required: boolean;
+  count: number; // 2 or 3
+}
+
 export interface QuestionnaireVersion {
   id: string;
   name: string;
@@ -63,6 +68,7 @@ export interface QuestionnaireVersion {
   description?: QuestionnaireDescription;
   report_total_average?: ReportTotalAverage;
   sections: Section[];
+  attachmentConfig?: AttachmentConfig;
 }
 
 // This defines the shape of the JSON file being uploaded.
@@ -90,6 +96,7 @@ export interface QuestionnaireUploadData {
   description?: QuestionnaireDescription;
   report_total_average?: ReportTotalAverage;
   sections: SectionUpload[];
+  attachmentConfig?: AttachmentConfig;
 }
 
 export interface Customer {
@@ -164,6 +171,12 @@ export interface CalculatedMatrixAnalysis {
   analysisText?: string;
 }
 
+export interface AttachmentFile {
+    name: string;
+    url: string;
+    size: number;
+    type: string;
+}
 
 export interface CustomerResponse {
   id: string; // This will be the same as the linkId
@@ -175,6 +188,7 @@ export interface CustomerResponse {
   questionnaireVersionName: string; // Denormalized from QuestionnaireVersion at submission
   submittedAt: Date;
   responses: Record<string, string>; // question.id -> option.id
+  attachments?: AttachmentFile[];
   dynamicComments?: { // Editable comments, initialized from questionnaire
     [sectionId: string]: string | undefined;
   };

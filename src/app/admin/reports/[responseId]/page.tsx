@@ -835,9 +835,9 @@ export default function ReportDetailsPage() {
       {/* Hidden containers for DOCX export */}
       <div className="absolute -left-[9999px] top-auto w-[800px] bg-white text-black p-4">
         <div ref={barChartExportRef} className="space-y-4 p-8">
-            <div className="space-y-4 pt-2">
+            <div className="space-y-4 pt-2 px-4">
                 {sortedIncludedBarScores.map((area) => (
-                <div key={area.sectionId} className="grid grid-cols-12 items-start gap-2 border-b pb-4 last:border-b-0 last:pb-0 px-4">
+                <div key={area.sectionId} className="grid grid-cols-12 items-start gap-2 border-b pb-4 last:border-b-0 last:pb-0">
                     <div className="col-span-4 font-medium text-sm self-start whitespace-normal">
                         <div>{area.sectionName}</div>
                          {area.analysisText && (

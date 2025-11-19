@@ -124,6 +124,7 @@ export default function ReportDetailsPage() {
   const [executiveSummaryComment, setExecutiveSummaryComment] = useState("");
   const [isSavingComment, setIsSavingComment] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isExportingAnswers, setIsExportingAnswers] = useState(false);
   const [selectedSections, setSelectedSections] = useState<Record<string, boolean>>({});
 
   const matrixChartRef = useRef<HTMLDivElement>(null);
@@ -727,6 +728,67 @@ export default function ReportDetailsPage() {
     }
   };
 
+  const handleExportAnswersToDocx = async () => {
+    if (!response || !questionnaire) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Data not available for export.' });
+        return;
+    }
+    setIsExportingAnswers(true);
+
+    try {
+        const docChildren: Paragraph[] = [];
+
+        docChildren.push(new Paragraph({
+            text: "Full Assessment Responses",
+            heading: HeadingLevel.TITLE,
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 240 },
+        }));
+
+        docChildren.push(new Paragraph({ text: `Report for: ${response.customerName || 'N/A'}` }));
+        docChildren.push(new Paragraph({ text: `Questionnaire: ${response.questionnaireVersionName}` }));
+        docChildren.push(new Paragraph({ text: `Submitted: ${format(response.submittedAt, 'PPP p')}`, spacing: { after: 240 } }));
+
+        for (const [sIdx, section] of questionnaire.sections.entries()) {
+            docChildren.push(new Paragraph({
+                text: `Section ${sIdx + 1}: ${section.name}`,
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 200, after: 100 },
+                border: { bottom: { color: "auto", space: 1, value: "single", size: 6 } }
+            }));
+
+            for (const [qIdx, question] of section.questions.entries()) {
+                const selectedOptionId = response.responses[question.id];
+                const selectedOption = question.options.find(opt => opt.id === selectedOptionId);
+                
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: `${qIdx + 1}. ${question.question}`, bold: true })],
+                    spacing: { before: 120, after: 60 }
+                }));
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: `Answer: ${selectedOption?.text ?? "Not answered"}`, italics: true })],
+                    spacing: { after: 120 },
+                    indent: { left: 720 } // 0.5 inch indent
+                }));
+            }
+        }
+        
+        const doc = new Document({
+            sections: [{ children: docChildren }],
+        });
+
+        Packer.toBlob(doc).then(blob => {
+            saveAs(blob, `Full-Answers-${response.customerName?.replace(/\s/g, '_') || response.id}.docx`);
+        });
+
+    } catch (error) {
+        console.error("Error exporting answers to DOCX:", error);
+        toast({ variant: "destructive", title: "Export Failed", description: "Could not generate the answers document." });
+    } finally {
+        setIsExportingAnswers(false);
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -893,10 +955,14 @@ export default function ReportDetailsPage() {
                         ))}
                     </div>
                  </ScrollArea>
-                 <DialogFooter>
-                    <Button variant="outline" asChild>
-                        <DialogTrigger>Close</DialogTrigger>
+                 <DialogFooter className="sm:justify-between gap-2">
+                    <Button onClick={handleExportAnswersToDocx} disabled={isExportingAnswers}>
+                        {isExportingAnswers ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                        Export as Word
                     </Button>
+                    <DialogTrigger asChild>
+                       <Button variant="outline">Close</Button>
+                    </DialogTrigger>
                  </DialogFooter>
              </DialogContent>
            </Dialog>
@@ -1196,3 +1262,5 @@ export default function ReportDetailsPage() {
     </div>
   );
 }
+
+    

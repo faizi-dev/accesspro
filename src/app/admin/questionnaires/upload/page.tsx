@@ -35,7 +35,7 @@ export default function UploadQuestionnairePage() {
   const [versionName, setVersionName] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [jsonContent, setJsonContent] = useState('');
-  const [attachmentConfig, setAttachmentConfig] = useState<AttachmentConfig>({ required: false, count: 2 });
+  const [attachmentConfig, setAttachmentConfig] = useState<AttachmentConfig>({ required: false, count: 1 });
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -186,7 +186,7 @@ export default function UploadQuestionnairePage() {
       setVersionName('');
       setFile(null);
       setJsonContent('');
-      setAttachmentConfig({ required: false, count: 2 });
+      setAttachmentConfig({ required: false, count: 1 });
     } catch (error: any) {
       console.error("Error uploading questionnaire: ", error);
       toast({
@@ -372,6 +372,7 @@ export default function UploadQuestionnairePage() {
                                 <SelectValue placeholder="Select number" />
                             </SelectTrigger>
                             <SelectContent>
+                                <SelectItem value="1">1 File</SelectItem>
                                 <SelectItem value="2">2 Files</SelectItem>
                                 <SelectItem value="3">3 Files</SelectItem>
                             </SelectContent>
@@ -428,3 +429,5 @@ export default function UploadQuestionnairePage() {
     </Card>
   );
 }
+
+    

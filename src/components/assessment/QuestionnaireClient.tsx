@@ -55,6 +55,9 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
 
   const currentSection = questionnaire.sections[currentSectionIndex];
   
+  // This is the key logic change for the bug fix
+  const isLastSectionWithoutAttachments = currentSectionIndex === questionnaire.sections.length - 1 && !questionnaire.attachmentConfig?.required;
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentSectionIndex, showIntro]);
@@ -189,8 +192,14 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
   const handleSubmit = async () => {
     let finalAttachments: AttachmentFile[] = [];
     
+    // Check if on the last question section and if all questions are answered
+    if (isLastSectionWithoutAttachments && !areAllQuestionsAnswered()) {
+        toast({ variant: "destructive", title: "Incomplete Final Section", description: "Please answer all questions before submitting." });
+        return;
+    }
+    
     if (questionnaire.attachmentConfig?.required) {
-        if (files.length === 0) {
+        if (files.length < 1 && isAttachmentStep) { // Check if on attachment step
              toast({ variant: "destructive", title: "Attachments Missing", description: `Please upload at least one file.` });
              return;
         }
@@ -199,9 +208,6 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
              toast({ variant: "destructive", title: "Upload Failed", description: "File upload failed. Please try again." });
              return;
         }
-    } else if (isAttachmentStep && !areAllQuestionsAnswered()) {
-       toast({ variant: "destructive", title: "Incomplete Final Section", description: "Please answer all questions in this final section." });
-       return;
     }
     
     setIsLoading(true);
@@ -308,7 +314,7 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle className="text-2xl font-headline text-primary">{questionnaire.name}</CardTitle>
-            <Badge variant="outline">Step {currentStep} of {totalSteps}</Badge>
+            <Badge variant="outline">Step {Math.min(currentStep, totalSteps)} of {totalSteps}</Badge>
           </div>
           <Progress value={progressPercentage} className="w-full mt-2" />
         </CardHeader>
@@ -319,7 +325,7 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
             <CardHeader>
                 <div className="flex items-center gap-2">
                     <Paperclip className="h-6 w-6 text-primary"/>
-                    <CardTitle className="text-xl font-semibold">Upload Attachments (Optional)</CardTitle>
+                    <CardTitle className="text-xl font-semibold">Upload Attachments</CardTitle>
                 </div>
                 <CardDescription>
                     Please upload up to 3 documents to complete your submission.
@@ -368,7 +374,7 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
                 )}
             </CardContent>
         </Card>
-      ) : currentSection && (
+      ) : currentSection ? (
         <Card key={currentSection.id} className="shadow-xl animate-subtle-slide-in" style={{animationDelay: '0.3s'}}>
           <CardHeader>
             <CardTitle className="text-xl font-semibold">{currentSectionIndex + 1}. {currentSection.name}</CardTitle>
@@ -426,7 +432,7 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
             })}
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
       <div className="flex justify-between items-center mt-8 animate-subtle-slide-in" style={{animationDelay: '0.5s'}}>
         <Button variant="outline" onClick={() => saveProgress()} disabled={isLoading || isUploading}>
@@ -437,14 +443,10 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
             <ChevronLeft className="mr-2 h-4 w-4" /> Previous
           </Button>
           
-          {!isAttachmentStep ? (
-            <Button onClick={handleNextSection} disabled={isLoading || isUploading || !areAllQuestionsAnswered()} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              Next Step <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          ) : (
+          {isLastSectionWithoutAttachments || isAttachmentStep ? (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button disabled={isLoading || isUploading || (questionnaire.attachmentConfig?.required && files.length === 0)} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                <Button disabled={isLoading || isUploading || (isAttachmentStep && files.length === 0) || (isLastSectionWithoutAttachments && !areAllQuestionsAnswered())} className="bg-accent hover:bg-accent/90 text-accent-foreground">
                    {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4" />}
                    {isUploading ? "Uploading..." : "Submit Questionnaire"}
                 </Button>
@@ -453,7 +455,7 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
                 <AlertDialogHeader>
                   <AlertDialogTitle>Confirm Submission</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to submit your answers and attachments? You will not be able to make changes after submission.
+                    Are you sure you want to submit your answers? You will not be able to make changes after submission.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -464,6 +466,10 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+          ) : (
+            <Button onClick={handleNextSection} disabled={isLoading || isUploading || !areAllQuestionsAnswered()} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+              Next Step <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
           )}
 
         </div>
@@ -471,3 +477,5 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
     </div>
   );
 }
+
+    

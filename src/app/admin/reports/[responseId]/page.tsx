@@ -10,7 +10,7 @@ import { doc, getDoc, Timestamp, updateDoc } from 'firebase/firestore';
 import type { AttachmentFile, AreaScoreText, CustomerResponse, QuestionnaireVersion, Section as SectionType, ReportTotalAverage, CalculatedSectionScore, CalculatedCountAnalysis, CalculatedMatrixAnalysis } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, FileText, AlertCircle, Edit, Star, Download, Loader2, MessageSquareQuote, ListOrdered, Paperclip } from 'lucide-react';
+import { ArrowLeft, FileText, AlertCircle, Edit, Star, Download, Loader2, MessageSquareQuote, ListOrdered, Paperclip, Printer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -129,6 +129,7 @@ export default function ReportDetailsPage() {
   const matrixChartRef = useRef<HTMLDivElement>(null);
   const barChartExportRef = useRef<HTMLDivElement>(null);
   const countAnalysisExportRef = useRef<HTMLDivElement>(null);
+  const allAnswersPrintRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
     if (responseId) {
@@ -854,6 +855,23 @@ export default function ReportDetailsPage() {
     }
   };
 
+  const handlePrintAnswers = () => {
+    if (allAnswersPrintRef.current) {
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.write('<html><head><title>Print All Answers</title>');
+            // Optional: Add some basic styling for printing
+            printWindow.document.write('<style>body { font-family: sans-serif; } .section-title { font-size: 1.2em; font-weight: bold; border-bottom: 1px solid black; padding-bottom: 5px; margin-top: 20px; } .question { font-weight: bold; } .answer { padding-left: 20px; font-style: italic; color: #333; }</style>');
+            printWindow.document.write('</head><body>');
+            printWindow.document.write(allAnswersPrintRef.current.innerHTML);
+            printWindow.document.write('</body></html>');
+            printWindow.document.close();
+            printWindow.focus();
+            printWindow.print();
+        }
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -963,6 +981,34 @@ export default function ReportDetailsPage() {
             </div>
             ))}
         </div>
+         <div ref={allAnswersPrintRef}>
+            <h2 style={{fontSize: '1.5em', fontWeight: 'bold', textAlign: 'center'}}>Full Assessment Responses</h2>
+            <p>Report for: {response.customerName || 'N/A'}</p>
+            <p>Questionnaire: {response.questionnaireVersionName}</p>
+            <p>Submitted: {format(response.submittedAt, 'PPP p')}</p>
+            <hr style={{margin: '20px 0'}} />
+            {questionnaire.sections.map((section, sIdx) => (
+                <div key={section.id} className="printable-section">
+                    <h3 className="section-title">
+                        Section {sIdx + 1}: {section.name}
+                    </h3>
+                    <div style={{paddingLeft: '10px'}}>
+                        {section.questions.map((question, qIdx) => {
+                            const selectedOptionId = response.responses[question.id];
+                            const selectedOption = question.options.find(opt => opt.id === selectedOptionId);
+                            return (
+                                <div key={question.id} style={{marginBottom: '10px'}}>
+                                    <p className="question">{qIdx + 1}. {question.question}</p>
+                                    <p className="answer">
+                                        &rarr; {selectedOption?.text ?? "Not answered"}
+                                    </p>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            ))}
+        </div>
       </div>
       
       <style jsx global>{`
@@ -974,6 +1020,7 @@ export default function ReportDetailsPage() {
           .print-shadow-none { box-shadow: none !important; }
           .print-border-none { border: none !important; }
           .page-break-before { page-break-before: always; }
+          .printable-section { break-inside: avoid-page; }
         }
       `}</style>
 
@@ -1019,11 +1066,17 @@ export default function ReportDetailsPage() {
                         ))}
                     </div>
                  </ScrollArea>
-                 <DialogFooter className="sm:justify-between gap-2">
-                    <Button onClick={handleExportAnswersToDocx} disabled={isExportingAnswers}>
-                        {isExportingAnswers ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                        Export as Word
-                    </Button>
+                 <DialogFooter className="sm:justify-between flex-wrap gap-2">
+                    <div className="flex gap-2">
+                        <Button onClick={handleExportAnswersToDocx} disabled={isExportingAnswers}>
+                            {isExportingAnswers ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                            Export as Word
+                        </Button>
+                        <Button variant="outline" onClick={handlePrintAnswers}>
+                           <Printer className="mr-2 h-4 w-4" />
+                           Export as PDF
+                        </Button>
+                    </div>
                     <DialogTrigger asChild>
                        <Button variant="outline">Close</Button>
                     </DialogTrigger>

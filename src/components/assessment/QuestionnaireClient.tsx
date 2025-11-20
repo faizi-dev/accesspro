@@ -155,7 +155,7 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
             .from('upval_files')
             .upload(filePath, file, {
                 cacheControl: '3600',
-                upsert: false
+                upsert: true
             });
 
         if (error) {
@@ -199,14 +199,16 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
     }
     
     if (questionnaire.attachmentConfig?.required) {
-        if (files.length < 1 && isAttachmentStep) { // Check if on attachment step
+        if (files.length === 0 && isAttachmentStep) {
              toast({ variant: "destructive", title: "Attachments Missing", description: `Please upload at least one file.` });
              return;
         }
-        finalAttachments = await handleFileUpload();
-        if (finalAttachments.length !== files.length) {
-             toast({ variant: "destructive", title: "Upload Failed", description: "File upload failed. Please try again." });
-             return;
+        if (files.length > 0) {
+            finalAttachments = await handleFileUpload();
+            if (finalAttachments.length !== files.length) {
+                toast({ variant: "destructive", title: "Upload Failed", description: "File upload failed. Please try again." });
+                return;
+            }
         }
     }
     
@@ -328,7 +330,7 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
                     <CardTitle className="text-xl font-semibold">Upload Attachments</CardTitle>
                 </div>
                 <CardDescription>
-                    Please upload up to 3 documents to complete your submission.
+                    Please upload up to 3 documents to complete your submission. At least one file is required.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -477,5 +479,7 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
     </div>
   );
 }
+
+    
 
     

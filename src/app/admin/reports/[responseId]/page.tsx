@@ -29,6 +29,7 @@ import {
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table as DocxTable, TableRow as DocxTableRow, TableCell as DocxTableCell, WidthType, ImageRun, AlignmentType, ShadingType, ExternalHyperlink } from 'docx';
 import { saveAs } from 'file-saver';
 import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 
 // Helper function to determine tailwind CSS class based on score
@@ -124,6 +125,7 @@ export default function ReportDetailsPage() {
   const [isSavingComment, setIsSavingComment] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isExportingAnswers, setIsExportingAnswers] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [selectedSections, setSelectedSections] = useState<Record<string, boolean>>({});
 
   const matrixChartRef = useRef<HTMLDivElement>(null);
@@ -441,7 +443,7 @@ export default function ReportDetailsPage() {
         if (matrixChartRef.current && shouldIncludeMatrix) {
             const canvas = await html2canvas(matrixChartRef.current, { backgroundColor: '#FFFFFF', scale: 2 });
             const imageDataUrl = canvas.toDataURL('image/png');
-            matrixChartImageBuffer = Buffer.from(imageDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
+            matrixChartImageBuffer = Buffer.from(imageDataUrl.replace(/^data:image\/png;base64:./, ''), 'base64');
         }
         
         let countAnalysisImageBuffer: ArrayBuffer | undefined;
@@ -855,22 +857,52 @@ export default function ReportDetailsPage() {
     }
   };
 
-  const handlePrintAnswers = () => {
-    if (allAnswersPrintRef.current) {
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
-            printWindow.document.write('<html><head><title>Print All Answers</title>');
-            // Optional: Add some basic styling for printing
-            printWindow.document.write('<style>body { font-family: sans-serif; } .section-title { font-size: 1.2em; font-weight: bold; border-bottom: 1px solid black; padding-bottom: 5px; margin-top: 20px; } .question { font-weight: bold; } .answer { padding-left: 20px; font-style: italic; color: #333; }</style>');
-            printWindow.document.write('</head><body>');
-            printWindow.document.write(allAnswersPrintRef.current.innerHTML);
-            printWindow.document.write('</body></html>');
-            printWindow.document.close();
-            printWindow.focus();
-            printWindow.print();
+  const handlePrintAnswers = async () => {
+    if (!allAnswersPrintRef.current || !response) return;
+    setIsExportingPdf(true);
+    try {
+        const canvas = await html2canvas(allAnswersPrintRef.current, {
+            scale: 2, // Increase resolution
+        });
+        const imgData = canvas.toDataURL('image/png');
+        
+        // Calculate dimensions
+        const pdf = new jsPDF({
+            orientation: 'p',
+            unit: 'mm',
+            format: 'a4'
+        });
+        
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+        const ratio = canvasWidth / canvasHeight;
+        
+        let imgWidth = pdfWidth - 20; // with margin
+        let imgHeight = imgWidth / ratio;
+        
+        let heightLeft = imgHeight;
+        let position = 10; // top margin
+
+        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+        heightLeft -= (pdfHeight - 20);
+
+        while (heightLeft > 0) {
+            position = -imgHeight + heightLeft;
+            pdf.addPage();
+            pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+            heightLeft -= (pdfHeight - 20);
         }
+
+        pdf.save(`Full-Answers-${response.customerName?.replace(/\s/g, '_') || response.id}.pdf`);
+    } catch(error) {
+        console.error("Error generating PDF:", error);
+        toast({ variant: "destructive", title: "Export Failed", description: "Could not generate the PDF file." });
+    } finally {
+        setIsExportingPdf(false);
     }
-  };
+};
 
 
   if (isLoading) {
@@ -918,7 +950,7 @@ export default function ReportDetailsPage() {
   return (
     <div className="space-y-8 p-4 md:p-6 print:p-2">
       {/* Hidden containers for DOCX export */}
-      <div className="absolute -left-[9999px] top-auto w-[800px] bg-white text-black p-4">
+      <div className="absolute -left-[9999px] top-auto w-auto bg-white text-black p-4">
         <div ref={barChartExportRef} className="space-y-4 p-8">
             <div className="space-y-4 pt-2 px-4">
                 {sortedIncludedBarScores.map((area) => (
@@ -981,33 +1013,35 @@ export default function ReportDetailsPage() {
             </div>
             ))}
         </div>
-         <div ref={allAnswersPrintRef}>
-            <h2 style={{fontSize: '1.5em', fontWeight: 'bold', textAlign: 'center'}}>Full Assessment Responses</h2>
-            <p>Report for: {response.customerName || 'N/A'}</p>
-            <p>Questionnaire: {response.questionnaireVersionName}</p>
-            <p>Submitted: {format(response.submittedAt, 'PPP p')}</p>
-            <hr style={{margin: '20px 0'}} />
-            {questionnaire.sections.map((section, sIdx) => (
-                <div key={section.id} className="printable-section">
-                    <h3 className="section-title">
-                        Section {sIdx + 1}: {section.name}
-                    </h3>
-                    <div style={{paddingLeft: '10px'}}>
-                        {section.questions.map((question, qIdx) => {
-                            const selectedOptionId = response.responses[question.id];
-                            const selectedOption = question.options.find(opt => opt.id === selectedOptionId);
-                            return (
-                                <div key={question.id} style={{marginBottom: '10px'}}>
-                                    <p className="question">{qIdx + 1}. {question.question}</p>
-                                    <p className="answer">
-                                        &rarr; {selectedOption?.text ?? "Not answered"}
-                                    </p>
-                                </div>
-                            );
-                        })}
+        <div ref={allAnswersPrintRef} className="p-8 bg-white text-black w-[210mm]">
+           <div className="printable-content space-y-6">
+                <h2 style={{fontSize: '1.5em', fontWeight: 'bold', textAlign: 'center'}}>Full Assessment Responses</h2>
+                <p>Report for: {response.customerName || 'N/A'}</p>
+                <p>Questionnaire: {response.questionnaireVersionName}</p>
+                <p>Submitted: {format(response.submittedAt, 'PPP p')}</p>
+                <hr style={{margin: '20px 0'}} />
+                {questionnaire.sections.map((section, sIdx) => (
+                    <div key={section.id} className="printable-section break-inside-avoid">
+                        <h3 className="text-lg font-semibold text-primary border-b pb-2 mb-3">
+                            Section {sIdx + 1}: {section.name}
+                        </h3>
+                        <div className="space-y-4">
+                            {section.questions.map((question, qIdx) => {
+                                const selectedOptionId = response.responses[question.id];
+                                const selectedOption = question.options.find(opt => opt.id === selectedOptionId);
+                                return (
+                                    <div key={question.id} className="text-sm">
+                                        <p className="font-medium">{qIdx + 1}. {question.question}</p>
+                                        <p className="text-slate-600 pl-4">
+                                            &rarr; <span className="italic">{selectedOption?.text ?? "Not answered"}</span>
+                                        </p>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
-                </div>
-            ))}
+                ))}
+            </div>
         </div>
       </div>
       
@@ -1072,8 +1106,8 @@ export default function ReportDetailsPage() {
                             {isExportingAnswers ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                             Export as Word
                         </Button>
-                        <Button variant="outline" onClick={handlePrintAnswers}>
-                           <Printer className="mr-2 h-4 w-4" />
+                        <Button variant="outline" onClick={handlePrintAnswers} disabled={isExportingPdf}>
+                           {isExportingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
                            Export as PDF
                         </Button>
                     </div>

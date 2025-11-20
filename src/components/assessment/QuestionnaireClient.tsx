@@ -2,8 +2,9 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import type { QuestionnaireVersion, Section, Question as QuestionType, AnswerOption, CustomerLink, EmailTemplate, AttachmentFile } from '@/lib/types';
+import type { QuestionnaireVersion, Section, Question as QuestionType, AnswerOption, CustomerLink, EmailTemplate, AttachmentFile, CustomerResponse } from '@/lib/types';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,8 +25,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { updateDoc, doc, serverTimestamp, setDoc, getDoc } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db } from '@/lib/firebase/config';
+import { getSupabaseClient } from '@/lib/supabase/config';
 
 interface QuestionnaireClientProps {
   questionnaire: QuestionnaireVersion;
@@ -138,14 +139,27 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
     if (files.length === 0) return [];
     
     setIsUploading(true);
-    const storage = getStorage();
+    const supabase = getSupabaseClient();
     const uploadedFilePromises = files.map(async (file) => {
-        const storageRef = ref(storage, `attachments/${linkId}/${file.name}`);
-        const snapshot = await uploadBytes(storageRef, file);
-        const downloadURL = await getDownloadURL(snapshot.ref);
+        const filePath = `attachments/${linkId}/${file.name}`;
+        const { data, error } = await supabase.storage
+            .from('upval_files')
+            .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: false
+            });
+
+        if (error) {
+            throw error;
+        }
+
+        const { data: urlData } = supabase.storage
+            .from('upval_files')
+            .getPublicUrl(filePath);
+
         return {
             name: file.name,
-            url: downloadURL,
+            url: urlData.publicUrl,
             size: file.size,
             type: file.type,
         };

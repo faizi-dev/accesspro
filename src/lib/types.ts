@@ -57,7 +57,7 @@ export interface ReportTotalAverage {
 
 export interface AttachmentConfig {
   required: boolean;
-  count: number; // 1, 2 or 3
+  count?: number; // max number of files, if required
 }
 
 export interface QuestionnaireVersion {
@@ -211,5 +211,3 @@ export interface EmailTemplate {
   body: string; // HTML body
   placeholders: string[];
 }
-
-    

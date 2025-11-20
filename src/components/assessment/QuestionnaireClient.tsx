@@ -127,7 +127,13 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       const selectedFiles = Array.from(event.target.files);
-      setFiles(prevFiles => [...prevFiles, ...selectedFiles]);
+      const combinedFiles = [...files, ...selectedFiles];
+
+      if (combinedFiles.length > 3) {
+        toast({ variant: "destructive", title: "Upload Limit Exceeded", description: "You can upload a maximum of 3 files."});
+        return;
+      }
+      setFiles(combinedFiles);
     }
   };
 
@@ -184,12 +190,12 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
     let finalAttachments: AttachmentFile[] = [];
     
     if (questionnaire.attachmentConfig?.required) {
-        if (files.length !== questionnaire.attachmentConfig.count) {
-             toast({ variant: "destructive", title: "Attachments Missing", description: `Please upload exactly ${questionnaire.attachmentConfig.count} files.` });
+        if (files.length === 0) {
+             toast({ variant: "destructive", title: "Attachments Missing", description: `Please upload at least one file.` });
              return;
         }
         finalAttachments = await handleFileUpload();
-        if (finalAttachments.length !== questionnaire.attachmentConfig.count) {
+        if (finalAttachments.length !== files.length) {
              toast({ variant: "destructive", title: "Upload Failed", description: "File upload failed. Please try again." });
              return;
         }
@@ -313,10 +319,10 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
             <CardHeader>
                 <div className="flex items-center gap-2">
                     <Paperclip className="h-6 w-6 text-primary"/>
-                    <CardTitle className="text-xl font-semibold">Upload Required Attachments</CardTitle>
+                    <CardTitle className="text-xl font-semibold">Upload Attachments (Optional)</CardTitle>
                 </div>
                 <CardDescription>
-                    Please upload exactly {questionnaire.attachmentConfig?.count} document(s) to complete your submission.
+                    Please upload up to 3 documents to complete your submission.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -326,7 +332,7 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
                         Drag and drop files here, or click to select files
                     </h3>
                     <p className="mt-1 text-xs text-muted-foreground">
-                        Supports PDF, DOCX, PNG, JPG, etc.
+                        Supports PDF, DOCX, PNG, JPG, etc. Max 3 files.
                     </p>
                     <Input
                         id="file-upload"
@@ -334,16 +340,16 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
                         multiple
                         className="sr-only"
                         onChange={handleFileChange}
-                        disabled={isUploading}
+                        disabled={isUploading || files.length >= 3}
                     />
-                    <Label htmlFor="file-upload" className="mt-4 inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-primary/90 cursor-pointer">
+                    <Label htmlFor="file-upload" className={`mt-4 inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-primary/90 ${files.length >= 3 ? 'cursor-not-allowed bg-muted' : 'cursor-pointer'}`}>
                         Select Files
                     </Label>
                 </div>
 
                 {files.length > 0 && (
                     <div className="space-y-2">
-                        <h4 className="font-medium">Selected files ({files.length} of {questionnaire.attachmentConfig?.count}):</h4>
+                        <h4 className="font-medium">Selected files ({files.length} of 3):</h4>
                         <ul className="space-y-2">
                             {files.map((file, index) => (
                                 <li key={index} className="flex items-center justify-between p-2 border rounded-md bg-secondary/30">
@@ -438,7 +444,7 @@ export default function QuestionnaireClient({ questionnaire, customerLink, linkI
           ) : (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button disabled={isLoading || isUploading || files.length !== questionnaire.attachmentConfig?.count} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                <Button disabled={isLoading || isUploading || (questionnaire.attachmentConfig?.required && files.length === 0)} className="bg-accent hover:bg-accent/90 text-accent-foreground">
                    {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4" />}
                    {isUploading ? "Uploading..." : "Submit Questionnaire"}
                 </Button>

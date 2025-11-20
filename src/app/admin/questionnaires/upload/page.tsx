@@ -35,7 +35,7 @@ export default function UploadQuestionnairePage() {
   const [versionName, setVersionName] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [jsonContent, setJsonContent] = useState('');
-  const [attachmentConfig, setAttachmentConfig] = useState<AttachmentConfig>({ required: false, count: 1 });
+  const [attachmentsRequired, setAttachmentsRequired] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -54,7 +54,7 @@ export default function UploadQuestionnairePage() {
                 setVersionName(parsed.versionName);
             }
             if (parsed.attachmentConfig) {
-                setAttachmentConfig(parsed.attachmentConfig);
+                setAttachmentsRequired(parsed.attachmentConfig.required);
             }
           } catch (err) {
             toast({ variant: "destructive", title: "Invalid JSON", description: "The file is not valid JSON." });
@@ -165,14 +165,17 @@ export default function UploadQuestionnairePage() {
 
       const newVersionId = generateSlug(versionName) || `v-${Date.now()}`;
 
-      const finalAttachmentConfig = questionnaireData.attachmentConfig ? questionnaireData.attachmentConfig : attachmentConfig;
+      const finalAttachmentConfig: AttachmentConfig = {
+          required: attachmentsRequired,
+          count: attachmentsRequired ? 3 : 0, // Simplified: if required, max is 3.
+      };
 
       const versionDoc = {
         name: versionName, // This is the overall questionnaire version name
         description: questionnaireData.description || null,
         report_total_average: questionnaireData.report_total_average || null,
         sections: processedSections,
-        attachmentConfig: finalAttachmentConfig.required ? finalAttachmentConfig : { required: false, count: 0 },
+        attachmentConfig: finalAttachmentConfig,
         isActive: false,
         createdAt: serverTimestamp(),
       };
@@ -186,7 +189,7 @@ export default function UploadQuestionnairePage() {
       setVersionName('');
       setFile(null);
       setJsonContent('');
-      setAttachmentConfig({ required: false, count: 1 });
+      setAttachmentsRequired(false);
     } catch (error: any) {
       console.error("Error uploading questionnaire: ", error);
       toast({
@@ -206,8 +209,7 @@ export default function UploadQuestionnairePage() {
     "details": "This assessment is designed to provide insights into key areas of your operations. It consists of multiple sections with closed-ended questions.\\n\\nPlease choose the response that best reflects your current situation. The estimated time for completion is around 50 minutes. You can save your progress at any time and resume later using the same link.\\n\\nIf a question is unclear, use the 'Need help answering?' button for additional context."
   },
   "attachmentConfig": {
-    "required": true,
-    "count": 2
+    "required": true
   },
   "report_total_average": {
     "green": "Body Healthy",
@@ -356,29 +358,11 @@ export default function UploadQuestionnairePage() {
                 <div className="flex items-center space-x-2">
                     <Switch 
                         id="attachments-required"
-                        checked={attachmentConfig.required} 
-                        onCheckedChange={(checked) => setAttachmentConfig(prev => ({ ...prev, required: checked }))}
+                        checked={attachmentsRequired} 
+                        onCheckedChange={setAttachmentsRequired}
                     />
-                    <Label htmlFor="attachments-required">Require File Attachments</Label>
+                    <Label htmlFor="attachments-required">Require File Attachments (max 3 files)</Label>
                 </div>
-                {attachmentConfig.required && (
-                    <div className="space-y-2 pl-2">
-                        <Label htmlFor="attachment-count">Number of required attachments</Label>
-                         <Select 
-                            value={String(attachmentConfig.count)} 
-                            onValueChange={(value) => setAttachmentConfig(prev => ({ ...prev, count: Number(value) }))}
-                         >
-                            <SelectTrigger id="attachment-count" className="w-[180px]">
-                                <SelectValue placeholder="Select number" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="1">1 File</SelectItem>
-                                <SelectItem value="2">2 Files</SelectItem>
-                                <SelectItem value="3">3 Files</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                )}
             </CardContent>
           </Card>
 

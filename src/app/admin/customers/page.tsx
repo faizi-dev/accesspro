@@ -46,6 +46,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { DatePicker } from '@/components/ui/date-picker'; 
 import { useToast } from '@/hooks/use-toast';
 import { UsersRound, PlusCircle, ClipboardList, LinkIcon, Trash2, CalendarDays, FileSignature, ExternalLink, Edit, ArrowUpDown, ArrowUp, ArrowDown, Loader2 } from 'lucide-react';
@@ -635,96 +636,101 @@ export default function AdminCustomersPage() {
 
       {selectedCustomer && (
         <Dialog open={isManageLinksOpen} onOpenChange={(isOpen) => { setIsManageLinksOpen(isOpen); if (!isOpen) setSelectedCustomer(null); }}>
-          <DialogContent className="sm:max-w-2xl">
+          <DialogContent className="sm:max-w-3xl flex flex-col h-full max-h-[90vh]">
             <DialogHeader>
               <DialogTitle>Manage Links for {`${selectedCustomer.firstName} ${selectedCustomer.lastName || ''}`.trim()}</DialogTitle>
               <DialogDescription>View, generate, or revoke assessment links for this customer.</DialogDescription>
             </DialogHeader>
-            <div className="py-4 space-y-4">
-              <Dialog open={isGenerateLinkOpen} onOpenChange={setIsGenerateLinkOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm">
-                    <FileSignature className="mr-2 h-4 w-4" /> Generate New Link
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Generate New Assessment Link</DialogTitle>
-                    <DialogDescription>Select a questionnaire and set an expiry date.</DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleGenerateLink} className="space-y-4 pt-4">
-                    <div>
-                      <Label htmlFor="questionnaireVersion">Questionnaire Version</Label>
-                       <Select value={selectedQuestionnaireId} onValueChange={setSelectedQuestionnaireId} disabled={isGeneratingLink}>
-                        <SelectTrigger id="questionnaireVersion">
-                          <SelectValue placeholder="Select a version" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {questionnaireVersions.length > 0 ? questionnaireVersions.map(v => (
-                            <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                          )) : <SelectItem value="-" disabled>No active versions</SelectItem>}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="expiresAt">Expires At</Label>
-                      <DatePicker date={linkExpiresAt} setDate={setLinkExpiresAt} className="w-full" disabled={isGeneratingLink}/>
-                    </div>
-                    <DialogFooter>
-                      <DialogClose asChild><Button type="button" variant="outline" disabled={isGeneratingLink}>Cancel</Button></DialogClose>
-                      <Button type="submit" disabled={isGeneratingLink}>
-                        {isGeneratingLink ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Generating...
-                            </>
-                        ) : "Generate Link"}
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-
-              {isLoadingLinks ? (
-                 <div className="space-y-2"> {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
-              ) : customerLinks.length === 0 ? (
-                <p className="text-muted-foreground text-sm text-center py-4">No links found for this customer.</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Questionnaire</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Expires At</TableHead>
-                      <TableHead>Link</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {customerLinks.map(link => (
-                      <TableRow key={link.id}>
-                        <TableCell>{link.questionnaireVersionName || link.questionnaireVersionId}</TableCell>
-                        <TableCell><span className={`px-2 py-1 text-xs rounded-full ${link.status === 'completed' ? 'bg-green-100 text-green-700' : link.status === 'pending' || link.status === 'started' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>{link.status}</span></TableCell>
-                        <TableCell>{format(link.expiresAt, "PPP")}</TableCell>
-                        <TableCell>
-                          <Link href={`/assessment/${link.id}`} target="_blank">
-                            <span className="text-primary hover:underline flex items-center text-sm">
-                              <ExternalLink className="h-3 w-3 mr-1"/> View
-                            </span>
-                          </Link>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" onClick={() => handleDeleteLink(link.id)} aria-label="Delete link">
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
+            
+            <div className="flex-none">
+                <Dialog open={isGenerateLinkOpen} onOpenChange={setIsGenerateLinkOpen}>
+                    <DialogTrigger asChild>
+                    <Button size="sm">
+                        <FileSignature className="mr-2 h-4 w-4" /> Generate New Link
+                    </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Generate New Assessment Link</DialogTitle>
+                        <DialogDescription>Select a questionnaire and set an expiry date.</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleGenerateLink} className="space-y-4 pt-4">
+                        <div>
+                        <Label htmlFor="questionnaireVersion">Questionnaire Version</Label>
+                        <Select value={selectedQuestionnaireId} onValueChange={setSelectedQuestionnaireId} disabled={isGeneratingLink}>
+                            <SelectTrigger id="questionnaireVersion">
+                            <SelectValue placeholder="Select a version" />
+                            </SelectTrigger>
+                            <SelectContent>
+                            {questionnaireVersions.length > 0 ? questionnaireVersions.map(v => (
+                                <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                            )) : <SelectItem value="-" disabled>No active versions</SelectItem>}
+                            </SelectContent>
+                        </Select>
+                        </div>
+                        <div>
+                        <Label htmlFor="expiresAt">Expires At</Label>
+                        <DatePicker date={linkExpiresAt} setDate={setLinkExpiresAt} className="w-full" disabled={isGeneratingLink}/>
+                        </div>
+                        <DialogFooter>
+                        <DialogClose asChild><Button type="button" variant="outline" disabled={isGeneratingLink}>Cancel</Button></DialogClose>
+                        <Button type="submit" disabled={isGeneratingLink}>
+                            {isGeneratingLink ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Generating...
+                                </>
+                            ) : "Generate Link"}
+                        </Button>
+                        </DialogFooter>
+                    </form>
+                    </DialogContent>
+                </Dialog>
             </div>
-             <DialogFooter>
+            
+            <ScrollArea className="flex-grow pr-6 -mr-6">
+                <div className="space-y-4">
+                {isLoadingLinks ? (
+                    <div className="space-y-2"> {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+                ) : customerLinks.length === 0 ? (
+                    <p className="text-muted-foreground text-sm text-center py-4">No links found for this customer.</p>
+                ) : (
+                    <Table>
+                    <TableHeader>
+                        <TableRow>
+                        <TableHead>Questionnaire</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Expires At</TableHead>
+                        <TableHead>Link</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {customerLinks.map(link => (
+                        <TableRow key={link.id}>
+                            <TableCell>{link.questionnaireVersionName || link.questionnaireVersionId}</TableCell>
+                            <TableCell><span className={`px-2 py-1 text-xs rounded-full ${link.status === 'completed' ? 'bg-green-100 text-green-700' : link.status === 'pending' || link.status === 'started' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>{link.status}</span></TableCell>
+                            <TableCell>{format(link.expiresAt, "PPP")}</TableCell>
+                            <TableCell>
+                            <Link href={`/assessment/${link.id}`} target="_blank">
+                                <span className="text-primary hover:underline flex items-center text-sm">
+                                <ExternalLink className="h-3 w-3 mr-1"/> View
+                                </span>
+                            </Link>
+                            </TableCell>
+                            <TableCell className="text-right">
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteLink(link.id)} aria-label="Delete link">
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                            </TableCell>
+                        </TableRow>
+                        ))}
+                    </TableBody>
+                    </Table>
+                )}
+                </div>
+            </ScrollArea>
+            <DialogFooter className="flex-none">
                 <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
             </DialogFooter>
           </DialogContent>
@@ -733,3 +739,5 @@ export default function AdminCustomersPage() {
     </div>
   );
 }
+
+    
